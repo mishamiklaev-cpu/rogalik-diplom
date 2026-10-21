@@ -9,7 +9,7 @@ class Dungeon
   public:
     int widthField = 0;
     int heightField = 0;
-    bool isRoomCollide(const Room &a, const Room &b);
+    bool IsRoomCollide(const Room &a, const Room &b);
 
     std::vector<std::vector<Tile>> cell;
     std::vector<Room> rooms;

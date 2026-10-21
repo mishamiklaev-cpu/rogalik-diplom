@@ -22,7 +22,6 @@ int main()
     // создаем объект Dungeon, вызвать Generate Room.
     Dungeon dungeon;
     dungeon.Generate(CAMERA_CELL_WIDTH, CAMERA_CELL_HEIGHT);
-    Room room;
 
     sf::View camera;                                           // создаем камеру
     camera.setSize(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT)); // ее размеры
@@ -50,7 +49,7 @@ int main()
 
         for (const Room &existingRoom : dungeon.rooms)
         {
-            if (dungeon.isRoomCollide(newRoom, existingRoom))
+            if (dungeon.IsRoomCollide(newRoom, existingRoom))
             {
                 noCollide = false;
                 break;

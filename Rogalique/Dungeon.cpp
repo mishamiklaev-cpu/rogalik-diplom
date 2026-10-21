@@ -45,14 +45,6 @@ void Dungeon::CarveRoom(const Room &room)
 
 void Dungeon::CarveCorridor(int xRoomCentr1, int yRoomCentr1, int xRoomCentr2, int yRoomCentr2)
 {
-    // for (int x = xRoomCentr1; x <= xRoomCentr2;
-    //	x++) {
-    //	cell[yRoomCentr1][x] = Tile::Floor;
-    // }
-    // for (int y = yRoomCentr1; y <= yRoom2Centr2;
-    //	y++) {
-    //	cell[y][xRoomCentr2] = Tile::Floor;
-    // }
 
     int x = xRoomCentr1;
     while (x != xRoomCentr2)
@@ -106,7 +98,7 @@ void Dungeon::Draw(sf::RenderWindow &window)
     }
 }
 
-bool Dungeon::isRoomCollide(const Room &a, const Room &b)
+bool Dungeon::IsRoomCollide(const Room &a, const Room &b)
 {
     // 1. Проверяем пересечение по оси X (горизонталь)
     bool CollideX = (a.xRoom < b.xRoom + b.widthRoom) && (a.xRoom + a.widthRoom > b.xRoom);

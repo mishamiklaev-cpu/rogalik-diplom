@@ -19,6 +19,6 @@ class Enemy
     void SpawnEnemy(const std::vector<Room> &rooms);
     void DrawEnemy(sf::RenderWindow &window);
     void FindPlayer(const Player &player, const Dungeon &dungeon);
-    bool canMove(int xDirection, int yDirection, const Dungeon &dungeon);
+    bool CanMove(int xDirection, int yDirection, const Dungeon &dungeon);
     void MoveEnemy(int xDirection, int yDirection, const Dungeon &dungeon);
 };
