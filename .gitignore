@@ -1,0 +1,15 @@
+# temporary directories
+.vs
+x64
+x86
+*.user
+
+# only own code is committed; course template parts stay local
+SFML/
+SFMLTemplate/
+TemperatureConversioin/
+packages/
+NewProject.bat
+new_project.ps1
+openal32.dll
+журнал-проекта.md
