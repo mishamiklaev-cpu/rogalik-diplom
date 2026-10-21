@@ -28,11 +28,11 @@ void Enemy::SpawnEnemy(const std::vector<Room> &rooms)
 
 void Enemy::DrawEnemy(sf::RenderWindow &window)
 {
-    sf::RectangleShape EnemyShape;
-    EnemyShape.setSize(sf::Vector2f(widthEnemy * TILE_SIZE, heightEnemy * TILE_SIZE));
-    EnemyShape.setFillColor(sf::Color::Magenta);
-    EnemyShape.setPosition(sf::Vector2f(xCellEnemy * TILE_SIZE, yCellEnemy * TILE_SIZE));
-    window.draw(EnemyShape);
+    sf::RectangleShape enemyShape;
+    enemyShape.setSize(sf::Vector2f(widthEnemy * TILE_SIZE, heightEnemy * TILE_SIZE));
+    enemyShape.setFillColor(sf::Color::Magenta);
+    enemyShape.setPosition(sf::Vector2f(xCellEnemy * TILE_SIZE, yCellEnemy * TILE_SIZE));
+    window.draw(enemyShape);
 };
 
 void Enemy::FindPlayer(const Player &player, const Dungeon &dungeon)
@@ -61,13 +61,13 @@ void Enemy::FindPlayer(const Player &player, const Dungeon &dungeon)
     if (absX > absY)
     {
         // ПРИОРИТЕТ: Ось X
-        if (moveX != 0 && canMove(moveX, 0, dungeon))
+        if (moveX != 0 && CanMove(moveX, 0, dungeon))
         {
             MoveEnemy(moveX, 0, dungeon);
             return; // Успешно пошли по X, выходим
         }
         // Не получилось по X, пробуем Y
-        if (moveY != 0 && canMove(0, moveY, dungeon))
+        if (moveY != 0 && CanMove(0, moveY, dungeon))
         {
             MoveEnemy(0, moveY, dungeon);
             return;
@@ -76,13 +76,13 @@ void Enemy::FindPlayer(const Player &player, const Dungeon &dungeon)
     else
     {
         // ПРИОРИТЕТ: Ось Y
-        if (moveY != 0 && canMove(0, moveY, dungeon))
+        if (moveY != 0 && CanMove(0, moveY, dungeon))
         {
             MoveEnemy(0, moveY, dungeon);
             return; // Успешно пошли по Y, выходим
         }
         // Не получилось по Y, пробуем X
-        if (moveX != 0 && canMove(moveX, 0, dungeon))
+        if (moveX != 0 && CanMove(moveX, 0, dungeon))
         {
             MoveEnemy(moveX, 0, dungeon);
             return;
@@ -90,35 +90,26 @@ void Enemy::FindPlayer(const Player &player, const Dungeon &dungeon)
     }
 }
 
-bool Enemy::canMove(int xDirection, int yDirection, const Dungeon &dungeon)
+bool Enemy::CanMove(int xDirection, int yDirection, const Dungeon &dungeon)
 {
     int newX = xCellEnemy + xDirection;
     int newY = yCellEnemy + yDirection;
 
-    // Проверяем границы карты
     if (newX < 0 || newX >= dungeon.widthField || newY < 0 || newY >= dungeon.heightField)
     {
         return false;
     }
 
-    // Проверяем, не стена ли там
     if (dungeon.cell[newY][newX] == Tile::Wall)
     {
         return false;
     }
 
-    return true; // Можно двигаться!
+    return true; 
 }
 
 void Enemy::MoveEnemy(int xDirection, int yDirection, const Dungeon &dungeon)
 {
     xCellEnemy += xDirection;
     yCellEnemy += yDirection;
-
-    if (xCellEnemy < 0 || xCellEnemy >= dungeon.widthField || yCellEnemy < 0 ||
-        yCellEnemy >= dungeon.heightField || dungeon.cell[yCellEnemy][xCellEnemy] == Tile::Wall)
-    {
-        xCellEnemy -= xDirection;
-        yCellEnemy -= yDirection;
-    }
 }
