@@ -42,8 +42,8 @@ void Dungeon::GenerateLevel(int widthMap, int heightMap)
         newRoom.heightRoom = rand() % (widthNewRoom - heightNewRoom + 1) + heightNewRoom;
 
         // случайное местоположение комнаты по x и y
-        newRoom.xRoom = rand() % (CAMERA_CELL_WIDTH - newRoom.widthRoom) + 1;
-        newRoom.yRoom = rand() % (CAMERA_CELL_HEIGHT - newRoom.heightRoom) + 1;
+        newRoom.xRoom = rand() % (MAP_CELLS_WIDTH - newRoom.widthRoom) + 1;
+        newRoom.yRoom = rand() % (MAP_CELLS_HEIGHT - newRoom.heightRoom) + 1;
 
         bool noCollide = true;
 
@@ -72,6 +72,20 @@ void Dungeon::GenerateLevel(int widthMap, int heightMap)
         int xRoomCentr2 = rooms[i + 1].xRoom + (rooms[i + 1].widthRoom / 2);
         int yRoomCentr2 = rooms[i + 1].yRoom + (rooms[i + 1].heightRoom / 2);
         CarveCorridor(xRoomCentr1, yRoomCentr1, xRoomCentr2, yRoomCentr2);
+    }
+
+    // периметр карты — всегда стена: генерация карвила случайно и могла
+    // прорезать край. Обнесённый край даёт игроку видимые границы мира
+    // и смотрится как цельная крепость, а не обрезанная земля
+    for (int x = 0; x < widthField; x++)
+    {
+        cell[0][x] = Tile::Wall;                // верхняя грань
+        cell[heightField - 1][x] = Tile::Wall;  // нижняя грань
+    }
+    for (int y = 0; y < heightField; y++)
+    {
+        cell[y][0] = Tile::Wall;                // левая грань
+        cell[y][widthField - 1] = Tile::Wall;   // правая грань
     }
 }
 

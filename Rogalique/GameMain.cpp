@@ -10,7 +10,7 @@
 // переход на новый уровень: обновляем весь мир за один кадр.
 void StartNextLevel(Dungeon &dungeon, Player &player, Enemy &enemy, Door &door)
 {
-    dungeon.GenerateLevel(CAMERA_CELL_WIDTH, CAMERA_CELL_HEIGHT);
+    dungeon.GenerateLevel(MAP_CELLS_WIDTH, MAP_CELLS_HEIGHT);
     player.SpawnPlayerInRandomRoom(dungeon.rooms);
 
     int spawnAttempts = 0;
@@ -43,13 +43,13 @@ int main()
 
     // создаем объект Dungeon: уровень собирается одним методом класса
     Dungeon dungeon;
-    dungeon.GenerateLevel(CAMERA_CELL_WIDTH, CAMERA_CELL_HEIGHT);
+    dungeon.GenerateLevel(MAP_CELLS_WIDTH, MAP_CELLS_HEIGHT);
 
     sf::View camera;  // создаем камеру
     camera.setSize(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT)); // ее размеры
     camera.setCenter(
-        sf::Vector2f(static_cast<float>((CAMERA_CELL_WIDTH * TILE_SIZE) / 2.f),
-                     static_cast<float>((CAMERA_CELL_HEIGHT * TILE_SIZE) / 2.f))); // центрируем
+        sf::Vector2f(static_cast<float>((MAP_CELLS_WIDTH * TILE_SIZE) / 2.f),
+                     static_cast<float>((MAP_CELLS_HEIGHT * TILE_SIZE) / 2.f))); // центрируем
 
     Player player;
     player.SpawnPlayerInRandomRoom(dungeon.rooms);
@@ -191,11 +191,39 @@ int main()
         sf::Vector2f cameraPosition(player.xCellPlayer* TILE_SIZE + (TILE_SIZE / 2.f),
             player.yCellPlayer* TILE_SIZE + (TILE_SIZE / 2.f));
 
+        // зажим камеры в границы мира: центр не выйдет за пол-окна от края,
+        // поэтому чернота за пределами карты никогда не попадёт в кадр.
+        // Зажим идёт ДО тряски — базовая позиция всегда внутри мира
+        const float edgeScreenX = WINDOW_WIDTH / 2.0f;
+        const float edgeScreenY = WINDOW_HEIGHT / 2.0f;
+        const float worldWidth = dungeon.widthField * TILE_SIZE;
+        const float worldHeight = dungeon.heightField * TILE_SIZE;
+
+        cameraPosition.x = std::max(edgeScreenX, std::min(cameraPosition.x, worldWidth - edgeScreenX));
+        cameraPosition.y = std::max(edgeScreenY, std::min(cameraPosition.y, worldHeight - edgeScreenY));
+
+        // тряска при поимке: случайный сдвиг от -10 до +10 по обеим осям.
+        // Если сдвиг с текущей позиции вывалился бы за край мира —
+        // отражаем его в противоположную сторону: дрожь остаётся полной
+        // даже у края карты и черноту не показывает
         if (enemyCatchesPlayer)
         {
-            //rand() % 21 даёт число 0..20; вычитаем 10 → получаем от -10 до +10
-            cameraPosition.x += static_cast<float>(rand() % 21 - 10);
-            cameraPosition.y += static_cast<float>(rand() % 21 - 10);
+            int shakeX = rand() % 21 - 10;
+            int shakeY = rand() % 21 - 10;
+
+            if (cameraPosition.x + shakeX < edgeScreenX
+                || cameraPosition.x + shakeX > worldWidth - edgeScreenX)
+            {
+                shakeX = -shakeX;
+            }
+            if (cameraPosition.y + shakeY < edgeScreenY
+                || cameraPosition.y + shakeY > worldHeight - edgeScreenY)
+            {
+                shakeY = -shakeY;
+            }
+
+            cameraPosition.x += static_cast<float>(shakeX);
+            cameraPosition.y += static_cast<float>(shakeY);
         }
 
         camera.setCenter(cameraPosition);
