@@ -14,7 +14,8 @@ class Dungeon
     std::vector<std::vector<Tile>> cell;
     std::vector<Room> rooms;
 
-    void Generate(int widthMap, int heightMap);
+    void GenerateField(int widthMap, int heightMap);
+    void GenerateLevel(int widthMap, int heightMap);
     void CarveRoom(const Room &room);
     void CarveCorridor(int xRoomCentr1, int yRoomCentr1, int xRoomCentr2, int yRoom2Centr2);
     void Draw(sf::RenderWindow &window);

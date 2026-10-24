@@ -1,7 +1,8 @@
 #include "Dungeon.h"
 #include "Constants.h"
+#include <cstdlib>
 
-void Dungeon::Generate(int widthMap, int heightMap)
+void Dungeon::GenerateField(int widthMap, int heightMap)
 {
 
     widthField = widthMap; // поле создается и присуждается к размерам карты
@@ -24,14 +25,62 @@ void Dungeon::Generate(int widthMap, int heightMap)
     }
 }
 
+void Dungeon::GenerateLevel(int widthMap, int heightMap)
+{
+    // пустое поле целиком из стен
+    GenerateField(widthMap, heightMap);
+
+    // на новом уровне не должны остаться комнаты предыдущего 
+    rooms.clear();
+
+    // генерируем 10 попыток создания непересекающихся комнат
+    for (int attempt = 0; attempt < 10; attempt++)
+    {
+        // случайная комната 4х8
+        Room newRoom;
+        newRoom.widthRoom = rand() % (widthNewRoom - heightNewRoom + 1) + heightNewRoom;
+        newRoom.heightRoom = rand() % (widthNewRoom - heightNewRoom + 1) + heightNewRoom;
+
+        // случайное местоположение комнаты по x и y
+        newRoom.xRoom = rand() % (CAMERA_CELL_WIDTH - newRoom.widthRoom) + 1;
+        newRoom.yRoom = rand() % (CAMERA_CELL_HEIGHT - newRoom.heightRoom) + 1;
+
+        bool noCollide = true;
+
+        for (const Room &existingRoom : rooms)
+        {
+            if (IsRoomCollide(newRoom, existingRoom))
+            {
+                noCollide = false;
+                break;
+            }
+        }
+
+        // если пересечений нет — добавляем комнату и вырезаем её в поле
+        if (noCollide)
+        {
+            rooms.push_back(newRoom);
+            CarveRoom(newRoom);
+        }
+    }
+
+    // коридоры между центрами соседних комнат
+    for (size_t i = 0; i < rooms.size() - 1; i++)
+    {
+        int xRoomCentr1 = rooms[i].xRoom + (rooms[i].widthRoom / 2);
+        int yRoomCentr1 = rooms[i].yRoom + (rooms[i].heightRoom / 2);
+        int xRoomCentr2 = rooms[i + 1].xRoom + (rooms[i + 1].widthRoom / 2);
+        int yRoomCentr2 = rooms[i + 1].yRoom + (rooms[i + 1].heightRoom / 2);
+        CarveCorridor(xRoomCentr1, yRoomCentr1, xRoomCentr2, yRoomCentr2);
+    }
+}
+
 void Dungeon::CarveRoom(const Room &room)
 {
     if (room.xRoom + room.widthRoom <= widthField && room.yRoom + room.heightRoom <= heightField)
 
     {
-        for (int yRoom
-
-             = room.yRoom;
+        for (int yRoom = room.yRoom;
              yRoom < (room.yRoom + room.heightRoom); yRoom++)
         {
 
