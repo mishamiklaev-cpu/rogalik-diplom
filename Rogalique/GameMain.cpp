@@ -1,10 +1,32 @@
 ﻿#include "Constants.h"
+#include "Door.h"
 #include "Dungeon.h"
 #include "Enemy.h"
 #include "Player.h"
 #include "Room.h"
 #include <cmath>
 #include <ctime>
+
+// переход на новый уровень: обновляем весь мир за один кадр.
+void StartNextLevel(Dungeon &dungeon, Player &player, Enemy &enemy, Door &door)
+{
+    dungeon.GenerateLevel(CAMERA_CELL_WIDTH, CAMERA_CELL_HEIGHT);
+    player.SpawnPlayerInRandomRoom(dungeon.rooms);
+
+    int spawnAttempts = 0;
+    int distance = 0;
+    do
+    {
+        enemy.SpawnEnemy(dungeon.rooms);
+        distance = std::abs(enemy.xCellEnemy - player.xCellPlayer) +
+                   std::abs(enemy.yCellEnemy - player.yCellPlayer);
+        spawnAttempts++;
+
+    } while (distance < 10 && spawnAttempts < 50);
+
+    // дверь нового уровня меряем от нового игрока
+    door.SpawnDoor(dungeon.rooms, player.xCellPlayer, player.yCellPlayer);
+}
 
 int main()
 {
@@ -19,59 +41,15 @@ int main()
     // генератор окна
     sf::RenderWindow window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "ROGALIC_PRACTICE_Dungeon");
 
-    // создаем объект Dungeon, вызвать Generate Room.
+    // создаем объект Dungeon: уровень собирается одним методом класса
     Dungeon dungeon;
-    dungeon.Generate(CAMERA_CELL_WIDTH, CAMERA_CELL_HEIGHT);
+    dungeon.GenerateLevel(CAMERA_CELL_WIDTH, CAMERA_CELL_HEIGHT);
 
-    sf::View camera;                                           // создаем камеру
+    sf::View camera;  // создаем камеру
     camera.setSize(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT)); // ее размеры
     camera.setCenter(
         sf::Vector2f(static_cast<float>((CAMERA_CELL_WIDTH * TILE_SIZE) / 2.f),
                      static_cast<float>((CAMERA_CELL_HEIGHT * TILE_SIZE) / 2.f))); // центрируем
-
-    // rand() % (b - a + 1) + a
-
-    // генерируем 10 попыток создания непересекаю-ся комнат
-
-    for (int attempt = 0; attempt < 10; attempt++)
-    {
-        // вызываем рандом room по ширине, высоте. room 4х8
-
-        Room newRoom; // создали комнату
-        newRoom.widthRoom = rand() % (widthNewRoom - heightNewRoom + 1) + heightNewRoom;
-        newRoom.heightRoom = rand() % (widthNewRoom - heightNewRoom + 1) + heightNewRoom;
-
-        // вызываем рандом местоположению room по x и y
-        newRoom.xRoom = rand() % (CAMERA_CELL_WIDTH - newRoom.widthRoom) + 1;
-        newRoom.yRoom = rand() % (CAMERA_CELL_HEIGHT - newRoom.heightRoom) + 1;
-
-        bool noCollide = true;
-
-        for (const Room &existingRoom : dungeon.rooms)
-        {
-            if (dungeon.IsRoomCollide(newRoom, existingRoom))
-            {
-                noCollide = false;
-                break;
-            }
-        }
-
-        // если пересечений нет, добавляем комнату
-        if (noCollide)
-        {
-            dungeon.rooms.push_back(newRoom);
-            dungeon.CarveRoom(newRoom);
-        }
-    }
-
-    for (size_t i = 0; i < dungeon.rooms.size() - 1; i++)
-    {
-        int xRoomCentr1 = dungeon.rooms[i].xRoom + (dungeon.rooms[i].widthRoom / 2);
-        int yRoomCentr1 = dungeon.rooms[i].yRoom + (dungeon.rooms[i].heightRoom / 2);
-        int xRoomCentr2 = dungeon.rooms[i + 1].xRoom + (dungeon.rooms[i + 1].widthRoom / 2);
-        int yRoomCentr2 = dungeon.rooms[i + 1].yRoom + (dungeon.rooms[i + 1].heightRoom / 2);
-        dungeon.CarveCorridor(xRoomCentr1, yRoomCentr1, xRoomCentr2, yRoomCentr2);
-    }
 
     Player player;
     player.SpawnPlayerInRandomRoom(dungeon.rooms);
@@ -91,8 +69,30 @@ int main()
     } while (distance < 10 && spawnAttempts < 50);
     // Если ближе 10 клеток — переспавниваем
 
+    // выход с уровня: ставится после спавна игрока, чтобы знать, от кого мерить дистанцию
+    Door door;
+    door.SpawnDoor(dungeon.rooms, player.xCellPlayer, player.yCellPlayer);
+
     float moveCooldown = 0.0f;
     float enemyCooldown = 0.0f;
+
+    // переход на новый уровень: сразу после касания весь мир замирает,
+    // таймер держит паузу — задел под будущую музыку/анимацию перехода
+    bool FreezeTime = false;
+    float FreezeTimeTimer = 0.0f;
+
+    // ступени мигания: каждые FADE_STEP_TIME секунд альфа меняется на один «квадрат»
+    const float FADE_STEP = 255.0f / 5.0f; // пять ступеней: светлый... темнее... чёрный
+    const float FADE_STEP_TIME = 0.125f;
+    float fadeBlack= 0.0f; // 0 = прозрачно, 255 = полный чёрный
+    int switchDarkness = 0;  // 0 — не мигаем, +1 — затемняемся, -1 — осветляемся
+    float fadeStep= 0.0f;
+
+    // «занавес»: чёрный прямоугольник поверх всего экрана,
+    // видимой становится только его прозрачность
+    sf::RectangleShape fadeShape(sf::Vector2f(static_cast<float>(WINDOW_WIDTH),
+                                              static_cast<float>(WINDOW_HEIGHT)));
+    fadeShape.setFillColor(sf::Color(0, 0, 0, 0));
 
     while (window.isOpen())
     {
@@ -108,7 +108,7 @@ int main()
         moveCooldown -= deltaTime;
         enemyCooldown -= deltaTime;
 
-        if (moveCooldown <= 0.0f)
+        if (!FreezeTime && moveCooldown <= 0.0f)
         {
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::W))
             {
@@ -132,20 +132,87 @@ int main()
             }
         }
 
-        if (enemyCooldown <= 0.0f)
+        // игрок встал на выход — переход запускается один раз и дальше идёт по таймеру
+        if (!FreezeTime && player.xCellPlayer == door.xCellDoor && player.yCellPlayer == door.yCellDoor)
+        {
+            FreezeTime = true;
+            FreezeTimeTimer = 3.0f;
+        }
+
+        if (FreezeTime)
+        {
+            if (FreezeTimeTimer > 0.0f)
+            {
+                // фаза 1: пауза под будущую музыку перехода, мир заморожен
+                FreezeTimeTimer -= deltaTime;
+                if (FreezeTimeTimer <= 0.0f)
+                {
+                    switchDarkness = 1; // пауза кончилась — начинаем затемнение
+                    fadeStep= FADE_STEP_TIME;
+                }
+            }
+            else
+            {
+                // фаза 2/3: ступени затемнения, смена мира под чёрным, осветление
+                fadeStep-= deltaTime;
+                if (fadeStep<= 0.0f)
+                {
+                    fadeStep= FADE_STEP_TIME;
+                    fadeBlack+= switchDarkness * FADE_STEP;
+
+                    if (fadeBlack>= 255.0f)
+                    {
+                        // экран полностью чёрный — вот здесь меняется мир, глаз не видит подмены
+                        fadeBlack= 255.0f;
+                        StartNextLevel(dungeon, player, enemy, door);
+                        switchDarkness = -1;
+                    }
+                    else if (fadeBlack<= 0.0f)
+                    {
+                        fadeBlack= 0.0f;
+                        switchDarkness = 0;
+                        FreezeTime = false; // переход завершён
+                    }
+                }
+            }
+        }
+
+        if (!FreezeTime && enemyCooldown <= 0.0f)
         {
             enemy.FindPlayer(player, dungeon);
             enemyCooldown = 0.15f;
         }
 
-        camera.setCenter(sf::Vector2f(player.xCellPlayer * TILE_SIZE + (TILE_SIZE / 2.f),
-                                      player.yCellPlayer * TILE_SIZE + (TILE_SIZE / 2.f)));
+        //проверяем, догнал ли враг игрока 
+        bool enemyCatchesPlayer = (enemy.xCellEnemy == player.xCellPlayer
+            && enemy.yCellEnemy == player.yCellPlayer);
+
+        // позиция камеры: центр клетки игрока
+        sf::Vector2f cameraPosition(player.xCellPlayer* TILE_SIZE + (TILE_SIZE / 2.f),
+            player.yCellPlayer* TILE_SIZE + (TILE_SIZE / 2.f));
+
+        if (enemyCatchesPlayer)
+        {
+            //rand() % 21 даёт число 0..20; вычитаем 10 → получаем от -10 до +10
+            cameraPosition.x += static_cast<float>(rand() % 21 - 10);
+            cameraPosition.y += static_cast<float>(rand() % 21 - 10);
+        }
+
+        camera.setCenter(cameraPosition);
 
         window.clear();
         window.setView(camera);
         dungeon.Draw(window);
+        door.DrawDoor(window); // выход рисуем под юнитами: пол → дверь → игрок → враг
         player.DrawPlayer(window);
         enemy.DrawEnemy(window);
+
+        // затемнение рисуется последним и в экранных координатах:
+        // переключаемся на камеру по умолчанию, чтобы занавес накрыл ровно весь экран
+        window.setView(window.getDefaultView());
+        fadeShape.setFillColor(sf::Color(0, 0, 0, static_cast<sf::Uint8>(fadeBlack)));
+        window.draw(fadeShape);
+
         window.display();
     }
 }
