@@ -2,6 +2,7 @@
 #include "Constants.h"
 #include <cmath>
 #include <cstdlib>
+#include <queue>
 
 Enemy::Enemy()
 {
@@ -37,56 +38,88 @@ void Enemy::DrawEnemy(sf::RenderWindow &window)
 
 void Enemy::FindPlayer(const Player &player, const Dungeon &dungeon)
 {
-    int diffX = player.xCellPlayer - xCellEnemy;
-    int diffY = player.yCellPlayer - yCellEnemy;
-
-    int absX = std::abs(diffX);
-    int absY = std::abs(diffY);
-
-    // Определяем направление по X и Y
-    int moveX = 0;
-    int moveY = 0;
-
-    if (diffX > 0)
-        moveX = 1;
-    else if (diffX < 0)
-        moveX = -1;
-
-    if (diffY > 0)
-        moveY = 1;
-    else if (diffY < 0)
-        moveY = -1;
-
-    // Пробуем сначала по оси с большим расстоянием
-    if (absX > absY)
+    // направление искать уже не нужно
+    if (xCellEnemy == player.xCellPlayer && yCellEnemy == player.yCellPlayer)
     {
-        // ПРИОРИТЕТ: Ось X
-        if (moveX != 0 && CanMove(moveX, 0, dungeon))
+        return;
+    }
+
+    // BFS 
+    // расстояние: сколько шагов от этой клетки до игрока по проходам.
+    // dist = -1 значит "волна сюда не дошл" (стены не пускают)
+    const int heightField = dungeon.heightField;
+    const int widthField = dungeon.widthField;
+
+    std::vector<std::vector<int>> dist(heightField, std::vector<int>(widthField, -1)); //30 строк, 40 столбцов
+    std::queue<std::pair<int, int>> waveCell; // очередь: клетки, откуда волна пойдёт дальше
+
+    dist[player.yCellPlayer][player.xCellPlayer] = 0;//позиция игрока 
+    waveCell.push({ player.xCellPlayer, player.yCellPlayer });//суем его в fifo 
+
+    // шаги волны в четыре стороны (без диагоналей)
+    const int stepDx[4] = { 1, -1, 0, 0 };
+    const int stepDy[4] = { 0, 0, 1, -1 };
+
+    while (!waveCell.empty())
+    {
+        std::pair<int, int> pairXYCell = waveCell.front();
+        waveCell.pop(); //в lifo front положил, pop удалил 
+
+        for (int i = 0; i < 4; i++)
         {
-            MoveEnemy(moveX, 0, dungeon);
-            return; // Успешно пошли по X, выходим
-        }
-        // Не получилось по X, пробуем Y
-        if (moveY != 0 && CanMove(0, moveY, dungeon))
-        {
-            MoveEnemy(0, moveY, dungeon);
-            return;
+            int nx = pairXYCell.first + stepDx[i];
+            int ny = pairXYCell.second + stepDy[i];
+
+            if (nx < 0 || nx >= widthField || ny < 0 ||
+                ny >= heightField) // если итог шага за пределами карты, то волна туда не пойдёт
+            {
+                continue; // край карты
+            }
+            if (dungeon.cell[ny][nx] == Tile::Wall)
+            {
+                continue; // в стену волна не льётся
+            }
+            if (dist[ny][nx] != -1)
+            {
+                continue; // клетка уже отмечена 
+            }
+
+            dist[ny][nx] = dist[pairXYCell.second][pairXYCell.first] + 1;//преписан шаг расстояния 
+            waveCell.push({ nx, ny });//снова в fifo  для продолжения 
         }
     }
-    else
+
+    // среди четырёх соседей врага выбираем наименьшее расстояние
+    int bestStep = -1;
+    int bestDx = 0;
+    int bestDy = 0;
+
+    for (int i = 0; i < 4; i++)
     {
-        // ПРИОРИТЕТ: Ось Y
-        if (moveY != 0 && CanMove(0, moveY, dungeon))
+        if (!CanMove(stepDx[i], stepDy[i], dungeon))
         {
-            MoveEnemy(0, moveY, dungeon);
-            return; // Успешно пошли по Y, выходим
+            continue; // в стену или за край — не ход
         }
-        // Не получилось по Y, пробуем X
-        if (moveX != 0 && CanMove(moveX, 0, dungeon))
+
+        int ny = yCellEnemy + stepDy[i];
+        int nx = xCellEnemy + stepDx[i];
+
+        if (dist[ny][nx] == -1)
         {
-            MoveEnemy(moveX, 0, dungeon);
-            return;
+            continue; // клетка в закрытой зоне — до него нет пути вообще
         }
+
+        if (bestStep == -1 || dist[ny][nx] < bestStep)
+        {
+            bestStep = dist[ny][nx];
+            bestDx = stepDx[i];
+            bestDy = stepDy[i];
+        }
+    }
+
+    if (bestStep != -1)
+    {
+        MoveEnemy(bestDx, bestDy, dungeon);
     }
 }
 

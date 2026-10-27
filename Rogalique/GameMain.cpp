@@ -191,8 +191,7 @@ int main()
         sf::Vector2f cameraPosition(player.xCellPlayer* TILE_SIZE + (TILE_SIZE / 2.f),
             player.yCellPlayer* TILE_SIZE + (TILE_SIZE / 2.f));
 
-        // зажим камеры в границы мира: центр не выйдет за пол-окна от края,
-        // поэтому чернота за пределами карты никогда не попадёт в кадр.
+        // зажим камеры в границы мира: центр не выйдет за пол-окна от края
         // Зажим идёт ДО тряски — базовая позиция всегда внутри мира
         const float edgeScreenX = WINDOW_WIDTH / 2.0f;
         const float edgeScreenY = WINDOW_HEIGHT / 2.0f;
@@ -203,7 +202,6 @@ int main()
         cameraPosition.y = std::max(edgeScreenY, std::min(cameraPosition.y, worldHeight - edgeScreenY));
 
         // тряска при поимке: случайный сдвиг от -10 до +10 по обеим осям.
-        // Если сдвиг с текущей позиции вывалился бы за край мира —
         // отражаем его в противоположную сторону: дрожь остаётся полной
         // даже у края карты и черноту не показывает
         if (enemyCatchesPlayer)
