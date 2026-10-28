@@ -14,6 +14,8 @@ class Player
     int widthPlayer;
     int heightPlayer;
 
+    int hpPlayer;
+
     void SetPositionPlayer(int xCellPlayer, int yCellPlayer);
     void SpawnPlayerInRandomRoom(const std::vector<Room> &rooms);
     void DrawPlayer(sf::RenderWindow &window);

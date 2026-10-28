@@ -46,7 +46,10 @@ int main()
     dungeon.GenerateLevel(MAP_CELLS_WIDTH, MAP_CELLS_HEIGHT);
 
     sf::View camera;  // создаем камеру
-    camera.setSize(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT)); // ее размеры
+    // вид камеры = нижние 11/12 окна: верхняя 1/12 отдана панели HUD, поэтому игровой мир никогда не рисуется под панелью
+    camera.setSize(sf::Vector2f(static_cast<float>(WINDOW_WIDTH),
+                                static_cast<float>(WINDOW_HEIGHT) * 11.0f / 12.0f));
+    camera.setViewport(sf::FloatRect(0.0f, 1.0f / 12.0f, 1.0f, 11.0f / 12.0f));
     camera.setCenter(
         sf::Vector2f(static_cast<float>((MAP_CELLS_WIDTH * TILE_SIZE) / 2.f),
                      static_cast<float>((MAP_CELLS_HEIGHT * TILE_SIZE) / 2.f))); // центрируем
@@ -93,6 +96,49 @@ int main()
     sf::RectangleShape fadeShape(sf::Vector2f(static_cast<float>(WINDOW_WIDTH),
                                               static_cast<float>(WINDOW_HEIGHT)));
     fadeShape.setFillColor(sf::Color(0, 0, 0, 0));
+
+    // шрифт для игровой надписи и экрана смерти.
+    sf::Font font;
+    bool fontLoaded = font.loadFromFile("Fonts/Roboto-Black.ttf");
+    if (!fontLoaded)
+    {
+        fontLoaded = font.loadFromFile("Resources/Fonts/Roboto-Black.ttf");
+    }
+
+    // индикатор здоровья: значение читается прямо из игрока
+    sf::Text hpText("HP: " + std::to_string(player.hpPlayer), font, 24);
+    hpText.setFillColor(sf::Color::White);
+    hpText.setPosition(10.f, 13.f);
+
+    // счётчик уровня объявлен выше текстов: обе надписи читают его при создании
+    int levelNumber = 1;               // номер текущего уровня (расписание спавна)
+    sf::Text levelText("Level: " + std::to_string(levelNumber), font, 24);
+    levelText.setFillColor(sf::Color::White);
+    levelText.setPosition(130.f, 13.f);
+
+    // надпись экрана смерти, центрируется после создания (знаем ширину текста)
+    sf::Text gameOverText("Press Space to Restart", font, 32);
+    gameOverText.setFillColor(sf::Color::White);
+
+    // надписи экрана смерти. По вертикали — фиксированные места
+    // (заголовок / счёт / подсказка); по горизонтали центрируются в момент
+    // смерти, когда известны ширины всех текстов
+    sf::Text gameOverTitle("Game Over", font, 60);
+    gameOverTitle.setFillColor(sf::Color::Red);
+
+    // сколько уровней пройдено к моменту смерти
+    sf::Text gameOverStats("", font, 28);
+    gameOverStats.setFillColor(sf::Color::White);
+
+    // панель поверх экрана: тёмная полоса высотой 1/12 окна (уже, чем раньше),
+    // на ней читаются белые надписи HP и Level
+    sf::RectangleShape panelShape(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT / 12.0f));
+    panelShape.setPosition(0.f, 0.f);
+    panelShape.setFillColor(sf::Color(30, 30, 30));
+
+    // смерть и рестарт
+    bool gameOver = false;
+    float contactDamageTimer = 0.0f;   // пауза между ударами, пока враг стоит на игроке
 
     while (window.isOpen())
     {
@@ -157,15 +203,30 @@ int main()
                 fadeStep-= deltaTime;
                 if (fadeStep<= 0.0f)
                 {
-                    fadeStep= FADE_STEP_TIME;
+                    if (gameOver)
+                    {
+                        fadeStep= GAMEOVER_FADE_STEP_TIME; // смерть темнеет медленно
+                    }
+                    else
+                    {
+                        fadeStep= FADE_STEP_TIME;           // переход — в обычном темпе
+                    }
                     fadeBlack+= switchDarkness * FADE_STEP;
 
                     if (fadeBlack>= 255.0f)
                     {
-                        // экран полностью чёрный — вот здесь меняется мир, глаз не видит подмены
+                        // экран полностью чёрный — глаз не видит подмены
                         fadeBlack= 255.0f;
-                        StartNextLevel(dungeon, player, enemy, door);
-                        switchDarkness = -1;
+                        if (!gameOver)
+                        {
+                            // обычный переход: смена мира под чёрным
+                            StartNextLevel(dungeon, player, enemy, door);
+                            levelNumber++;                       // шаг уровня — для будущих расписаний спавна
+                            levelText.setString("Level: " + std::to_string(levelNumber));
+                            switchDarkness = -1;
+                        }
+                        // при gameOver чёрный экран просто держится —
+                        // пробел проверяется отдельно, каждый кадр (ниже)
                     }
                     else if (fadeBlack<= 0.0f)
                     {
@@ -177,24 +238,66 @@ int main()
             }
         }
 
+        // рестарт на экране смерти: проверяем ПРОБЕЛ каждый кадр
+        if (gameOver && fadeBlack >= 255.0f &&
+            sf::Keyboard::isKeyPressed(sf::Keyboard::Space))
+        {
+            player.hpPlayer = 100;
+            hpText.setString("HP: 100");
+            StartNextLevel(dungeon, player, enemy, door);
+            levelNumber = 1;
+            levelText.setString("Level: 1");
+            gameOver = false;
+            switchDarkness = -1;                 // осветляемся на новом уровне
+            fadeStep = GAMEOVER_FADE_STEP_TIME;  // осветление держит медленный темп
+        }
+
         if (!FreezeTime && enemyCooldown <= 0.0f)
         {
             enemy.FindPlayer(player, dungeon);
             enemyCooldown = 0.15f;
         }
 
-        //проверяем, догнал ли враг игрока 
+        //проверяем, догнал ли враг игрока
         bool enemyCatchesPlayer = (enemy.xCellEnemy == player.xCellPlayer
             && enemy.yCellEnemy == player.yCellPlayer);
+
+        // урон при поимке: враг стоит на клетке игрока — здоровье тратится
+        // через CONTACT_DAMAGE_INTERVAL секунд, пока контакт не прервётся
+        contactDamageTimer -= deltaTime; // тик таймера урона (каждый кадр)
+
+        if (enemyCatchesPlayer && !gameOver && contactDamageTimer <= 0.0f)
+        {
+            player.hpPlayer -= DAMAGE_ON_CATCH;
+            hpText.setString("HP: " + std::to_string(player.hpPlayer));
+            contactDamageTimer = CONTACT_DAMAGE_INTERVAL; // пауза до следующего удара
+
+            if (player.hpPlayer <= 0)
+            {
+                // смерть: замороженное медленное затемнение
+                gameOver = true;
+                FreezeTime = true;
+                FreezeTimeTimer = 0.0f;              // без 3-секундной паузы
+                switchDarkness = 1;                   // сразу темнеем
+                fadeStep = GAMEOVER_FADE_STEP_TIME;   // но медленно: шаг за 0.5 с
+
+                // счёт пройденных уровней: умерли на levelNumber —
+                // значит, завершили levelNumber − 1
+                gameOverStats.setString("You pass the Level: " + std::to_string(levelNumber - 1));
+
+                // центрируем все три надписи по горизонтали (по ширине каждой)
+                gameOverTitle.setPosition((WINDOW_WIDTH - gameOverTitle.getGlobalBounds().width) / 2.0f, 200.f);
+                gameOverStats.setPosition((WINDOW_WIDTH - gameOverStats.getGlobalBounds().width) / 2.0f, 280.f);
+                gameOverText.setPosition((WINDOW_WIDTH - gameOverText.getGlobalBounds().width) / 2.0f, 330.f);
+            }
+        }
 
         // позиция камеры: центр клетки игрока
         sf::Vector2f cameraPosition(player.xCellPlayer* TILE_SIZE + (TILE_SIZE / 2.f),
             player.yCellPlayer* TILE_SIZE + (TILE_SIZE / 2.f));
 
-        // зажим камеры в границы мира: центр не выйдет за пол-окна от края
-        // Зажим идёт ДО тряски — базовая позиция всегда внутри мира
-        const float edgeScreenX = WINDOW_WIDTH / 2.0f;
-        const float edgeScreenY = WINDOW_HEIGHT / 2.0f;
+        const float edgeScreenX = camera.getSize().x / 2.0f;
+        const float edgeScreenY = camera.getSize().y / 2.0f;
         const float worldWidth = dungeon.widthField * TILE_SIZE;
         const float worldHeight = dungeon.heightField * TILE_SIZE;
 
@@ -236,8 +339,28 @@ int main()
         // затемнение рисуется последним и в экранных координатах:
         // переключаемся на камеру по умолчанию, чтобы занавес накрыл ровно весь экран
         window.setView(window.getDefaultView());
+
+        // панель всегда: рисуем поверх мира, под занавесом
+        // (текстам нужен шрифт, панели — нет; поэтому разные условия)
+        window.draw(panelShape);
+
+        if (fontLoaded)
+        {
+            window.draw(hpText);
+            window.draw(levelText);
+        }
+
         fadeShape.setFillColor(sf::Color(0, 0, 0, static_cast<sf::Uint8>(fadeBlack)));
         window.draw(fadeShape);
+
+        if (fontLoaded && gameOver && fadeBlack >= 255.0f)
+                                     // экран смерти: только когда затемнение ДОШЛО
+                                     // до полного чёрного — сначала тьма, потом надписи
+        {
+            window.draw(gameOverTitle);
+            window.draw(gameOverStats);
+            window.draw(gameOverText);
+        }
 
         window.display();
     }
