@@ -3,12 +3,59 @@
 #include "Dungeon.h"
 #include "Enemy.h"
 #include "Player.h"
+#include "Potion.h"
 #include "Room.h"
 #include <cmath>
 #include <ctime>
+#include <string>
+#include <vector>
+
+// зелья здоровья: количество растёт каждый десяток уровней
+// (до 10 уровня — 1 шт, до 20 — 2 и т.д.). Спавним в случайные комнаты,
+// проверяем, чтобы клетка не совпала с игроком и с уже поставленными зельями
+void SpawnPotions(std::vector<Potion> &potions, const std::vector<Room> &rooms,
+                  const Player &player, int level)
+{
+    potions.clear(); // перегенерация уровня — старые зелья удаляются
+    int count = (level + 9) / 10;
+
+    for (int i = 0; i < count; i++)
+    {
+        int attempts = 0;
+        bool placed = false;
+        while (!placed && attempts < 50)
+        {
+            Potion potion;
+            potion.SpawnPotion(rooms);
+
+            bool sameCell = false;
+            if (potion.xPotion == player.xCellPlayer
+                && potion.yPotion == player.yCellPlayer)
+            {
+                sameCell = true; // зелье под ногами игрока — нечестно
+            }
+            for (const Potion &already : potions)
+            {
+                if (potion.xPotion == already.xPotion
+                    && potion.yPotion == already.yPotion)
+                {
+                    sameCell = true; // два зелья в одной клетке — мыльно и путает
+                }
+            }
+
+            if (!sameCell)
+            {
+                potions.push_back(potion);
+                placed = true;
+            }
+            attempts++; // защита от цикла: максимум 50 попыток на зелье
+        }
+    }
+}
 
 // переход на новый уровень: обновляем весь мир за один кадр.
-void StartNextLevel(Dungeon &dungeon, Player &player, Enemy &enemy, Door &door)
+void StartNextLevel(Dungeon &dungeon, Player &player, Enemy &enemy, Door &door,
+                    std::vector<Potion> &potions, int level)
 {
     dungeon.GenerateLevel(MAP_CELLS_WIDTH, MAP_CELLS_HEIGHT);
     player.SpawnPlayerInRandomRoom(dungeon.rooms);
@@ -26,6 +73,9 @@ void StartNextLevel(Dungeon &dungeon, Player &player, Enemy &enemy, Door &door)
 
     // дверь нового уровня меряем от нового игрока
     door.SpawnDoor(dungeon.rooms, player.xCellPlayer, player.yCellPlayer);
+
+    // зелья нового уровня (количество зависит от номера уровня)
+    SpawnPotions(potions, dungeon.rooms, player, level);
 }
 
 int main()
@@ -76,6 +126,13 @@ int main()
     Door door;
     door.SpawnDoor(dungeon.rooms, player.xCellPlayer, player.yCellPlayer);
 
+    // счётчик уровня объявлен заранее: его читают зелья при раскладке
+    int levelNumber = 1;               // номер текущего уровня (расписание спавна)
+
+    // вектор зелий уровня: количество растёт каждый десяток уровней
+    std::vector<Potion> potions;
+    SpawnPotions(potions, dungeon.rooms, player, levelNumber);
+
     float moveCooldown = 0.0f;
     float enemyCooldown = 0.0f;
 
@@ -110,8 +167,7 @@ int main()
     hpText.setFillColor(sf::Color::White);
     hpText.setPosition(10.f, 13.f);
 
-    // счётчик уровня объявлен выше текстов: обе надписи читают его при создании
-    int levelNumber = 1;               // номер текущего уровня (расписание спавна)
+    // счётчик уровня уже объявлен выше (зелья его читали): здесь только надпись
     sf::Text levelText("Level: " + std::to_string(levelNumber), font, 24);
     levelText.setFillColor(sf::Color::White);
     levelText.setPosition(130.f, 13.f);
@@ -178,6 +234,25 @@ int main()
             }
         }
 
+        // подбор зелья: игрок встал на клетку зелья — здоровье растёт,
+        // но не выше 100; зелье извлекается из вектора
+        for (int i = 0; i < potions.size(); i++)
+        {
+            if (player.xCellPlayer == potions[i].xPotion
+                && player.yCellPlayer == potions[i].yPotion)
+            {
+                int healAmount = POTION_HEAL;
+                if (player.hpPlayer + POTION_HEAL > 100)
+                {
+                    healAmount = 100 - player.hpPlayer; // лечим только до полного
+                }
+                player.hpPlayer += healAmount;
+                hpText.setString("HP: " + std::to_string(player.hpPlayer));
+                potions.erase(potions.begin() + i);
+                i--; 
+            }
+        }
+
         // игрок встал на выход — переход запускается один раз и дальше идёт по таймеру
         if (!FreezeTime && player.xCellPlayer == door.xCellDoor && player.yCellPlayer == door.yCellDoor)
         {
@@ -220,7 +295,7 @@ int main()
                         if (!gameOver)
                         {
                             // обычный переход: смена мира под чёрным
-                            StartNextLevel(dungeon, player, enemy, door);
+                            StartNextLevel(dungeon, player, enemy, door, potions, levelNumber);
                             levelNumber++;                       // шаг уровня — для будущих расписаний спавна
                             levelText.setString("Level: " + std::to_string(levelNumber));
                             switchDarkness = -1;
@@ -244,7 +319,7 @@ int main()
         {
             player.hpPlayer = 100;
             hpText.setString("HP: 100");
-            StartNextLevel(dungeon, player, enemy, door);
+            StartNextLevel(dungeon, player, enemy, door, potions, levelNumber);
             levelNumber = 1;
             levelText.setString("Level: 1");
             gameOver = false;
@@ -332,6 +407,13 @@ int main()
         window.clear();
         window.setView(camera);
         dungeon.Draw(window);
+
+        // зелья: лежат на полу, под юнитами (пол → зелья → дверь → игрок → враг)
+        for (const Potion &potion : potions)
+        {
+            potion.DrawPotion(window);
+        }
+
         door.DrawDoor(window); // выход рисуем под юнитами: пол → дверь → игрок → враг
         player.DrawPlayer(window);
         enemy.DrawEnemy(window);
