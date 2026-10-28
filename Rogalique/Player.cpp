@@ -8,6 +8,7 @@ Player::Player()
     yCellPlayer = 0;
     widthPlayer = 1;
     heightPlayer = 1;
+    hpPlayer = 100; // полное здоровье на старте
 }
 
 void Player::SetPositionPlayer(int x, int y)
