@@ -9,6 +9,9 @@ const int MAP_CELLS_HEIGHT = 30;
 // урон за поимку ищейкой: 4 поимки = 100 урона = конец игры
 const int DAMAGE_ON_CATCH = 25;
 
+// восстановление от зелья здоровья
+const int POTION_HEAL = 20;
+
 // пауза между ударами, пока враг стоит на клетке игрока (секунды)
 const float CONTACT_DAMAGE_INTERVAL = 0.8f;
 
