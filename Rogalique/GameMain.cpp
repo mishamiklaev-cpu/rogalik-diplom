@@ -2,6 +2,7 @@
 #include "Door.h"
 #include "Dungeon.h"
 #include "Enemy.h"
+#include "Particle.h"
 #include "Player.h"
 #include "Potion.h"
 #include "Room.h"
@@ -10,11 +11,30 @@
 #include <string>
 #include <vector>
 
+// врождённая вспышка частиц из точки события:
+// разлёт в случайные стороны, позиции слегка разбросаны вокруг точки
+void SpawnBurst(std::vector<Particle> &particles, float xPoint, float yPoint,
+                sf::Color color)
+{
+    for (int i = 0; i < PARTICLE_COUNT; i++)
+    {
+        Particle particle;
+        particle.xParticle = xPoint + static_cast<float>(rand() % 21 - 10);
+        particle.yParticle = yPoint + static_cast<float>(rand() % 21 - 10);
+        particle.dxParticle = static_cast<float>(rand() % 101 - 50); // -50..+50 px/c
+        particle.dyParticle = static_cast<float>(rand() % 101 - 50);
+        particle.lifeParticle = PARTICLE_LIFE_TIME;
+        particle.colorParticle = color;
+        particles.push_back(particle);
+    }
+}
+
 // зелья здоровья: количество растёт каждый десяток уровней
 // (до 10 уровня — 1 шт, до 20 — 2 и т.д.). Спавним в случайные комнаты,
-// проверяем, чтобы клетка не совпала с игроком и с уже поставленными зельями
+// проверяем, чтобы клетка не совпала с игроком, дверью выхода и уже
+// поставленными зельями
 void SpawnPotions(std::vector<Potion> &potions, const std::vector<Room> &rooms,
-                  const Player &player, int level)
+                  const Player &player, const Door &door, int level)
 {
     potions.clear(); // перегенерация уровня — старые зелья удаляются
     int count = (level + 9) / 10;
@@ -33,6 +53,11 @@ void SpawnPotions(std::vector<Potion> &potions, const std::vector<Room> &rooms,
                 && potion.yPotion == player.yCellPlayer)
             {
                 sameCell = true; // зелье под ногами игрока — нечестно
+            }
+            if (potion.xPotion == door.xCellDoor
+                && potion.yPotion == door.yCellDoor)
+            {
+                sameCell = true; // зелье на клетке выхода — дверь скрыта, запутает
             }
             for (const Potion &already : potions)
             {
@@ -75,7 +100,7 @@ void StartNextLevel(Dungeon &dungeon, Player &player, Enemy &enemy, Door &door,
     door.SpawnDoor(dungeon.rooms, player.xCellPlayer, player.yCellPlayer);
 
     // зелья нового уровня (количество зависит от номера уровня)
-    SpawnPotions(potions, dungeon.rooms, player, level);
+    SpawnPotions(potions, dungeon.rooms, player, door, level);
 }
 
 int main()
@@ -131,7 +156,10 @@ int main()
 
     // вектор зелий уровня: количество растёт каждый десяток уровней
     std::vector<Potion> potions;
-    SpawnPotions(potions, dungeon.rooms, player, levelNumber);
+    SpawnPotions(potions, dungeon.rooms, player, door, levelNumber);
+
+    // живые частицы: рождаются при событиях (удар, зелье), умирают по таймеру
+    std::vector<Particle> particles;
 
     float moveCooldown = 0.0f;
     float enemyCooldown = 0.0f;
@@ -248,6 +276,13 @@ int main()
                 }
                 player.hpPlayer += healAmount;
                 hpText.setString("HP: " + std::to_string(player.hpPlayer));
+
+                // зелёная вспышка в момент выпитого зелья
+                SpawnBurst(particles,
+                           static_cast<float>(player.xCellPlayer * TILE_SIZE) + TILE_SIZE / 2.0f,
+                           static_cast<float>(player.yCellPlayer * TILE_SIZE) + TILE_SIZE / 2.0f,
+                           sf::Color(30, 220, 60));
+
                 potions.erase(potions.begin() + i);
                 i--; 
             }
@@ -258,6 +293,17 @@ int main()
         {
             FreezeTime = true;
             FreezeTimeTimer = 3.0f;
+        }
+
+        // жизнь частиц: двигаем всех, затем мёртвых убираем из вектора
+        for (int i = 0; i < particles.size(); i++)
+        {
+            particles[i].UpdateParticle(deltaTime);
+            if (particles[i].lifeParticle <= 0.0f)
+            {
+                particles.erase(particles.begin() + i);
+                i--; // после erase не пропустить следующую частицу
+            }
         }
 
         if (FreezeTime)
@@ -347,6 +393,12 @@ int main()
             hpText.setString("HP: " + std::to_string(player.hpPlayer));
             contactDamageTimer = CONTACT_DAMAGE_INTERVAL; // пауза до следующего удара
 
+            // красные искры из центра клетки удара
+            SpawnBurst(particles,
+                       static_cast<float>(player.xCellPlayer * TILE_SIZE) + TILE_SIZE / 2.0f,
+                       static_cast<float>(player.yCellPlayer * TILE_SIZE) + TILE_SIZE / 2.0f,
+                       sf::Color(220, 30, 30));
+
             if (player.hpPlayer <= 0)
             {
                 // смерть: замороженное медленное затемнение
@@ -417,6 +469,12 @@ int main()
         door.DrawDoor(window); // выход рисуем под юнитами: пол → дверь → игрок → враг
         player.DrawPlayer(window);
         enemy.DrawEnemy(window);
+
+        // частицы поверх юнитов — они часть мира, но «верх» по слоям
+        for (const Particle &particle : particles)
+        {
+            particle.DrawParticle(window);
+        }
 
         // затемнение рисуется последним и в экранных координатах:
         // переключаемся на камеру по умолчанию, чтобы занавес накрыл ровно весь экран

@@ -12,6 +12,10 @@ const int DAMAGE_ON_CATCH = 25;
 // восстановление от зелья здоровья
 const int POTION_HEAL = 20;
 
+// частицы: базовая жизнь (сек) и число в одной вспышке
+const float PARTICLE_LIFE_TIME = 0.6f;
+const int PARTICLE_COUNT = 12;
+
 // пауза между ударами, пока враг стоит на клетке игрока (секунды)
 const float CONTACT_DAMAGE_INTERVAL = 0.8f;
 
