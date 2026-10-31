@@ -30,9 +30,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Game.h">
-      <Filter>Sources</Filter>
-    </ClInclude>
     <ClInclude Include="Constants.h">
       <Filter>Sources</Filter>
     </ClInclude>

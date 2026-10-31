@@ -106,7 +106,6 @@ void StartNextLevel(Dungeon &dungeon, Player &player, Enemy &enemy, Door &door,
 int main()
 {
     sf::Event event;
-    // Game game; game.Run();
 
     // генератор случайных чисел
     sf::Clock clock;
