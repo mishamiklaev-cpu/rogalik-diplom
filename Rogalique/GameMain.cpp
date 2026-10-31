@@ -113,7 +113,7 @@ int main()
     srand(seed);
 
     // генератор окна
-    sf::RenderWindow window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "ROGALIC_PRACTICE_Dungeon");
+    sf::RenderWindow window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Dungeon Escape");
 
     // создаем объект Dungeon: уровень собирается одним методом класса
     Dungeon dungeon;
@@ -340,8 +340,9 @@ int main()
                         if (!gameOver)
                         {
                             // обычный переход: смена мира под чёрным
+                            // номер растёт ДО генерации: зелья нового уровня считаются по его номеру
+                            levelNumber++;
                             StartNextLevel(dungeon, player, enemy, door, potions, levelNumber);
-                            levelNumber++;                       // шаг уровня — для будущих расписаний спавна
                             levelText.setString("Level: " + std::to_string(levelNumber));
                             switchDarkness = -1;
                         }
@@ -364,8 +365,9 @@ int main()
         {
             player.hpPlayer = 100;
             hpText.setString("HP: 100");
-            StartNextLevel(dungeon, player, enemy, door, potions, levelNumber);
+            // сначала сброс номера, потом генерация: иначе первый уровень получит зелья уровня смерти
             levelNumber = 1;
+            StartNextLevel(dungeon, player, enemy, door, potions, levelNumber);
             levelText.setString("Level: 1");
             gameOver = false;
             switchDarkness = -1;                 // осветляемся на новом уровне
@@ -389,6 +391,11 @@ int main()
         if (enemyCatchesPlayer && !gameOver && contactDamageTimer <= 0.0f)
         {
             player.hpPlayer -= DAMAGE_ON_CATCH;
+            // после зелья HP не кратно урону и может уйти в минус: на панели показываем 0
+            if (player.hpPlayer < 0)
+            {
+                player.hpPlayer = 0;
+            }
             hpText.setString("HP: " + std::to_string(player.hpPlayer));
             contactDamageTimer = CONTACT_DAMAGE_INTERVAL; // пауза до следующего удара
 
