@@ -63,7 +63,7 @@ void Enemy::FindPlayer(const Player &player, const Dungeon &dungeon)
     while (!waveCell.empty())
     {
         std::pair<int, int> pairXYCell = waveCell.front();
-        waveCell.pop(); //в lifo front положил, pop удалил 
+        waveCell.pop(); //в fifo front положил, pop удалил 
 
         for (int i = 0; i < 4; i++)
         {
