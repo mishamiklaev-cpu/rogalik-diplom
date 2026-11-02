@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-// врождённая вспышка частиц из точки события:
+// вспышка частиц из точки события:
 // разлёт в случайные стороны, позиции слегка разбросаны вокруг точки
 void SpawnBurst(std::vector<Particle> &particles, float xPoint, float yPoint,
                 sf::Color color)
@@ -109,7 +109,7 @@ int main()
 
     // генератор случайных чисел
     sf::Clock clock;
-    int seed = (int)time(nullptr); //??
+    int seed = (int)time(nullptr); // текущее время: каждый запуск — новое зерно, значит новая карта
     srand(seed);
 
     // генератор окна
@@ -371,7 +371,7 @@ int main()
             levelText.setString("Level: 1");
             gameOver = false;
             switchDarkness = -1;                 // осветляемся на новом уровне
-            fadeStep = GAMEOVER_FADE_STEP_TIME;  // осветление держит медленный темп
+            fadeStep = GAMEOVER_FADE_STEP_TIME;  // первая ступень осветления через 0.5 с, дальше обычный темп (gameOver уже false)
         }
 
         if (!freezeTime && enemyCooldown <= 0.0f)

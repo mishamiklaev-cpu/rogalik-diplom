@@ -20,7 +20,7 @@ void Particle::UpdateParticle(float deltaTime)
 
 void Particle::DrawParticle(sf::RenderWindow &window) const
 {
-    // мелкий квадрат: чуть больше клетки/16 — визуально «искры»
+    // мелкий квадрат 8 px — пятая часть клетки (40 px), визуально «искры»
     sf::RectangleShape particleShape(sf::Vector2f(8.f, 8.f));
     particleShape.setFillColor(colorParticle);
     particleShape.setPosition(sf::Vector2f(xParticle, yParticle));
