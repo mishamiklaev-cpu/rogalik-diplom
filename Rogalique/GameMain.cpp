@@ -262,16 +262,16 @@ int main()
         }
 
         // подбор зелья: игрок встал на клетку зелья — здоровье растёт,
-        // но не выше 100; зелье извлекается из вектора
+        // но не выше MAX_HP_PLAYER; зелье извлекается из вектора
         for (int i = 0; i < potions.size(); i++)
         {
             if (player.xCellPlayer == potions[i].xPotion
                 && player.yCellPlayer == potions[i].yPotion)
             {
                 int healAmount = POTION_HEAL;
-                if (player.hpPlayer + POTION_HEAL > 100)
+                if (player.hpPlayer + POTION_HEAL > MAX_HP_PLAYER)
                 {
-                    healAmount = 100 - player.hpPlayer; // лечим только до полного
+                    healAmount = MAX_HP_PLAYER - player.hpPlayer; // лечим только до полного
                 }
                 player.hpPlayer += healAmount;
                 hpText.setString("HP: " + std::to_string(player.hpPlayer));
@@ -363,8 +363,8 @@ int main()
         if (gameOver && fadeBlack >= 255.0f &&
             sf::Keyboard::isKeyPressed(sf::Keyboard::Space))
         {
-            player.hpPlayer = 100;
-            hpText.setString("HP: 100");
+            player.hpPlayer = MAX_HP_PLAYER;
+            hpText.setString("HP: " + std::to_string(player.hpPlayer));
             // сначала сброс номера, потом генерация: иначе первый уровень получит зелья уровня смерти
             levelNumber = 1;
             StartNextLevel(dungeon, player, enemy, door, potions, levelNumber);
