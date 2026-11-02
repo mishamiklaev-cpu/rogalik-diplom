@@ -16,6 +16,7 @@ class Player
 
     int hpPlayer;
 
+    // пока не вызывается: задел под «продолжить игру» — вернуть игрока на сохранённую клетку
     void SetPositionPlayer(int xCellPlayer, int yCellPlayer);
     void SpawnPlayerInRandomRoom(const std::vector<Room> &rooms);
     void DrawPlayer(sf::RenderWindow &window);

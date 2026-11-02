@@ -15,10 +15,11 @@ class Enemy
     int widthEnemy;
     int heightEnemy;
 
+    // пока не вызывается: задел под «продолжить игру» и новых врагов — поставить на заданную клетку
     void SetPositionEnemy(int xCellEnemy, int yCellEnemy);
     void SpawnEnemy(const std::vector<Room> &rooms);
     void DrawEnemy(sf::RenderWindow &window);
     void FindPlayer(const Player &player, const Dungeon &dungeon);
     bool CanMove(int xDirection, int yDirection, const Dungeon &dungeon);
-    void MoveEnemy(int xDirection, int yDirection, const Dungeon &dungeon);
+    void MoveEnemy(int xDirection, int yDirection);
 };
