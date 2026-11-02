@@ -10,6 +10,13 @@ Enemy::Enemy()
     yCellEnemy = 0;
     widthEnemy = 1;
     heightEnemy = 1;
+    colorEnemy = sf::Color::White; // наследник перекрасит в свой цвет
+}
+
+EnemyHound::EnemyHound()
+{
+    // сначала уже отработал конструктор Enemy, здесь только своё
+    colorEnemy = sf::Color::Magenta;
 }
 
 void Enemy::SetPositionEnemy(int x, int y)
@@ -31,12 +38,12 @@ void Enemy::DrawEnemy(sf::RenderWindow &window)
 {
     sf::RectangleShape enemyShape;
     enemyShape.setSize(sf::Vector2f(widthEnemy * TILE_SIZE, heightEnemy * TILE_SIZE));
-    enemyShape.setFillColor(sf::Color::Magenta);
+    enemyShape.setFillColor(colorEnemy);
     enemyShape.setPosition(sf::Vector2f(xCellEnemy * TILE_SIZE, yCellEnemy * TILE_SIZE));
     window.draw(enemyShape);
 };
 
-void Enemy::FindPlayer(const Player &player, const Dungeon &dungeon)
+void EnemyHound::FindPlayer(const Player &player, const Dungeon &dungeon)
 {
     // направление искать уже не нужно
     if (xCellEnemy == player.xCellPlayer && yCellEnemy == player.yCellPlayer)

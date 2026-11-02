@@ -85,7 +85,7 @@ void SpawnEnemies(std::vector<std::unique_ptr<Enemy>> &enemies,
                   const std::vector<Room> &rooms, const Player &player)
 {
     enemies.clear();
-    enemies.push_back(std::make_unique<Enemy>());
+    enemies.push_back(std::make_unique<EnemyHound>());
 
     int spawnAttempts = 0;
     int distance = 0;
