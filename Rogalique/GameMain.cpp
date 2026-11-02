@@ -416,7 +416,7 @@ int main()
 
                 // счёт пройденных уровней: умерли на levelNumber —
                 // значит, завершили levelNumber − 1
-                gameOverStats.setString("You pass the Level: " + std::to_string(levelNumber - 1));
+                gameOverStats.setString("Levels passed: " + std::to_string(levelNumber - 1));
 
                 // центрируем все три надписи по горизонтали (по ширине каждой)
                 gameOverTitle.setPosition((WINDOW_WIDTH - gameOverTitle.getGlobalBounds().width) / 2.0f, 200.f);
