@@ -165,8 +165,8 @@ int main()
 
     // переход на новый уровень: сразу после касания весь мир замирает,
     // таймер держит паузу — задел под будущую музыку/анимацию перехода
-    bool FreezeTime = false;
-    float FreezeTimeTimer = 0.0f;
+    bool freezeTime = false;
+    float freezeTimeTimer = 0.0f;
 
     // ступени мигания: каждые FADE_STEP_TIME секунд альфа меняется на один «квадрат»
     const float FADE_STEP = 255.0f / 5.0f; // пять ступеней: светлый... темнее... чёрный
@@ -237,7 +237,7 @@ int main()
         moveCooldown -= deltaTime;
         enemyCooldown -= deltaTime;
 
-        if (!FreezeTime && moveCooldown <= 0.0f)
+        if (!freezeTime && moveCooldown <= 0.0f)
         {
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::W))
             {
@@ -288,10 +288,10 @@ int main()
         }
 
         // игрок встал на выход — переход запускается один раз и дальше идёт по таймеру
-        if (!FreezeTime && player.xCellPlayer == door.xCellDoor && player.yCellPlayer == door.yCellDoor)
+        if (!freezeTime && player.xCellPlayer == door.xCellDoor && player.yCellPlayer == door.yCellDoor)
         {
-            FreezeTime = true;
-            FreezeTimeTimer = 3.0f;
+            freezeTime = true;
+            freezeTimeTimer = 3.0f;
         }
 
         // жизнь частиц: двигаем всех, затем мёртвых убираем из вектора
@@ -305,13 +305,13 @@ int main()
             }
         }
 
-        if (FreezeTime)
+        if (freezeTime)
         {
-            if (FreezeTimeTimer > 0.0f)
+            if (freezeTimeTimer > 0.0f)
             {
                 // фаза 1: пауза под будущую музыку перехода, мир заморожен
-                FreezeTimeTimer -= deltaTime;
-                if (FreezeTimeTimer <= 0.0f)
+                freezeTimeTimer -= deltaTime;
+                if (freezeTimeTimer <= 0.0f)
                 {
                     switchDarkness = 1; // пауза кончилась — начинаем затемнение
                     fadeStep= FADE_STEP_TIME;
@@ -353,7 +353,7 @@ int main()
                     {
                         fadeBlack= 0.0f;
                         switchDarkness = 0;
-                        FreezeTime = false; // переход завершён
+                        freezeTime = false; // переход завершён
                     }
                 }
             }
@@ -374,7 +374,7 @@ int main()
             fadeStep = GAMEOVER_FADE_STEP_TIME;  // осветление держит медленный темп
         }
 
-        if (!FreezeTime && enemyCooldown <= 0.0f)
+        if (!freezeTime && enemyCooldown <= 0.0f)
         {
             enemy.FindPlayer(player, dungeon);
             enemyCooldown = 0.15f;
@@ -409,8 +409,8 @@ int main()
             {
                 // смерть: замороженное медленное затемнение
                 gameOver = true;
-                FreezeTime = true;
-                FreezeTimeTimer = 0.0f;              // без 3-секундной паузы
+                freezeTime = true;
+                freezeTimeTimer = 0.0f;              // без 3-секундной паузы
                 switchDarkness = 1;                   // сразу темнеем
                 fadeStep = GAMEOVER_FADE_STEP_TIME;   // но медленно: шаг за 0.5 с
 

@@ -119,7 +119,7 @@ void Enemy::FindPlayer(const Player &player, const Dungeon &dungeon)
 
     if (bestStep != -1)
     {
-        MoveEnemy(bestDx, bestDy, dungeon);
+        MoveEnemy(bestDx, bestDy);
     }
 }
 
@@ -141,7 +141,8 @@ bool Enemy::CanMove(int xDirection, int yDirection, const Dungeon &dungeon)
     return true; 
 }
 
-void Enemy::MoveEnemy(int xDirection, int yDirection, const Dungeon &dungeon)
+// стену здесь не проверяем: шаг уже проверен в CanMove до вызова
+void Enemy::MoveEnemy(int xDirection, int yDirection)
 {
     xCellEnemy += xDirection;
     yCellEnemy += yDirection;

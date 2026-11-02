@@ -3,6 +3,5 @@
 enum class Tile
 {
     Wall,
-    Floor,
-    Door
+    Floor
 };
