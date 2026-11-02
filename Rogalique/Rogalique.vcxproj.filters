@@ -58,7 +58,4 @@
       <Filter>Sources</Filter>
     </ClInclude>
   </ItemGroup>
-  <ItemGroup>
-    <Text Include=".clang-format.txt" />
-  </ItemGroup>
 </Project>

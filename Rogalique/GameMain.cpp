@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-// врождённая вспышка частиц из точки события:
+// вспышка частиц из точки события:
 // разлёт в случайные стороны, позиции слегка разбросаны вокруг точки
 void SpawnBurst(std::vector<Particle> &particles, float xPoint, float yPoint,
                 sf::Color color)
@@ -109,7 +109,7 @@ int main()
 
     // генератор случайных чисел
     sf::Clock clock;
-    int seed = (int)time(nullptr); //??
+    int seed = (int)time(nullptr); // текущее время: каждый запуск — новое зерно, значит новая карта
     srand(seed);
 
     // генератор окна
@@ -262,16 +262,16 @@ int main()
         }
 
         // подбор зелья: игрок встал на клетку зелья — здоровье растёт,
-        // но не выше 100; зелье извлекается из вектора
+        // но не выше MAX_HP_PLAYER; зелье извлекается из вектора
         for (int i = 0; i < potions.size(); i++)
         {
             if (player.xCellPlayer == potions[i].xPotion
                 && player.yCellPlayer == potions[i].yPotion)
             {
                 int healAmount = POTION_HEAL;
-                if (player.hpPlayer + POTION_HEAL > 100)
+                if (player.hpPlayer + POTION_HEAL > MAX_HP_PLAYER)
                 {
-                    healAmount = 100 - player.hpPlayer; // лечим только до полного
+                    healAmount = MAX_HP_PLAYER - player.hpPlayer; // лечим только до полного
                 }
                 player.hpPlayer += healAmount;
                 hpText.setString("HP: " + std::to_string(player.hpPlayer));
@@ -363,15 +363,15 @@ int main()
         if (gameOver && fadeBlack >= 255.0f &&
             sf::Keyboard::isKeyPressed(sf::Keyboard::Space))
         {
-            player.hpPlayer = 100;
-            hpText.setString("HP: 100");
+            player.hpPlayer = MAX_HP_PLAYER;
+            hpText.setString("HP: " + std::to_string(player.hpPlayer));
             // сначала сброс номера, потом генерация: иначе первый уровень получит зелья уровня смерти
             levelNumber = 1;
             StartNextLevel(dungeon, player, enemy, door, potions, levelNumber);
             levelText.setString("Level: 1");
             gameOver = false;
             switchDarkness = -1;                 // осветляемся на новом уровне
-            fadeStep = GAMEOVER_FADE_STEP_TIME;  // осветление держит медленный темп
+            fadeStep = GAMEOVER_FADE_STEP_TIME;  // первая ступень осветления через 0.5 с, дальше обычный темп (gameOver уже false)
         }
 
         if (!freezeTime && enemyCooldown <= 0.0f)
@@ -416,7 +416,7 @@ int main()
 
                 // счёт пройденных уровней: умерли на levelNumber —
                 // значит, завершили levelNumber − 1
-                gameOverStats.setString("You pass the Level: " + std::to_string(levelNumber - 1));
+                gameOverStats.setString("Levels passed: " + std::to_string(levelNumber - 1));
 
                 // центрируем все три надписи по горизонтали (по ширине каждой)
                 gameOverTitle.setPosition((WINDOW_WIDTH - gameOverTitle.getGlobalBounds().width) / 2.0f, 200.f);
