@@ -38,8 +38,8 @@ void Dungeon::GenerateLevel(int widthMap, int heightMap)
     {
         // случайная комната 4х8
         Room newRoom;
-        newRoom.widthRoom = rand() % (widthNewRoom - heightNewRoom + 1) + heightNewRoom;
-        newRoom.heightRoom = rand() % (widthNewRoom - heightNewRoom + 1) + heightNewRoom;
+        newRoom.widthRoom = rand() % (WIDTH_NEW_ROOM - HEIGHT_NEW_ROOM + 1) + HEIGHT_NEW_ROOM;
+        newRoom.heightRoom = rand() % (WIDTH_NEW_ROOM - HEIGHT_NEW_ROOM + 1) + HEIGHT_NEW_ROOM;
 
         // случайное местоположение комнаты по x и y
         newRoom.xRoom = rand() % (MAP_CELLS_WIDTH - newRoom.widthRoom) + 1;
@@ -164,9 +164,9 @@ void Dungeon::Draw(sf::RenderWindow &window)
 bool Dungeon::IsRoomCollide(const Room &a, const Room &b)
 {
     // 1. Проверяем пересечение по оси X (горизонталь)
-    bool CollideX = (a.xRoom < b.xRoom + b.widthRoom) && (a.xRoom + a.widthRoom > b.xRoom);
+    bool collideX = (a.xRoom < b.xRoom + b.widthRoom) && (a.xRoom + a.widthRoom > b.xRoom);
     // 2. Проверяем пересечение по оси Y (вертикаль)
-    bool CollideY = (a.yRoom < b.yRoom + b.heightRoom) && (a.yRoom + a.heightRoom > b.yRoom);
+    bool collideY = (a.yRoom < b.yRoom + b.heightRoom) && (a.yRoom + a.heightRoom > b.yRoom);
     // 3. Если есть пересечение И там,И там — значит,комнаты наложились
-    return CollideX && CollideY;
+    return collideX && collideY;
 }

@@ -21,5 +21,5 @@ const float CONTACT_DAMAGE_INTERVAL = 0.8f;
 
 // скорость медленного затемнения при смерти: один шаг за 0.5 с (в 4 раза медленнее перехода)
 const float GAMEOVER_FADE_STEP_TIME = 0.5f;
-const int widthNewRoom = 8;
-const int heightNewRoom = 4;
+const int WIDTH_NEW_ROOM = 8;
+const int HEIGHT_NEW_ROOM = 4;
