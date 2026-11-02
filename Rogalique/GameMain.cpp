@@ -8,6 +8,7 @@
 #include "Room.h"
 #include <cmath>
 #include <ctime>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -78,23 +79,35 @@ void SpawnPotions(std::vector<Potion> &potions, const std::vector<Room> &rooms,
     }
 }
 
-// переход на новый уровень: обновляем весь мир за один кадр.
-void StartNextLevel(Dungeon &dungeon, Player &player, Enemy &enemy, Door &door,
-                    std::vector<Potion> &potions, int level)
+// враги уровня: пока одна ищейка. В векторе лежат unique_ptr — указатель
+// владеет врагом, и clear() сам освобождает память старых врагов
+void SpawnEnemies(std::vector<std::unique_ptr<Enemy>> &enemies,
+                  const std::vector<Room> &rooms, const Player &player)
 {
-    dungeon.GenerateLevel(MAP_CELLS_WIDTH, MAP_CELLS_HEIGHT);
-    player.SpawnPlayerInRandomRoom(dungeon.rooms);
+    enemies.clear();
+    enemies.push_back(std::make_unique<Enemy>());
 
     int spawnAttempts = 0;
     int distance = 0;
     do
     {
-        enemy.SpawnEnemy(dungeon.rooms);
-        distance = std::abs(enemy.xCellEnemy - player.xCellPlayer) +
-                   std::abs(enemy.yCellEnemy - player.yCellPlayer);
+        enemies.back()->SpawnEnemy(rooms);
+        // проверяем, не слишком ли близко к игроку
+        distance = std::abs(enemies.back()->xCellEnemy - player.xCellPlayer) +
+                   std::abs(enemies.back()->yCellEnemy - player.yCellPlayer);
         spawnAttempts++;
 
-    } while (distance < 10 && spawnAttempts < 50);
+    } while (distance < 10 && spawnAttempts < 50); // ближе 10 клеток — переспавниваем
+}
+
+// переход на новый уровень: обновляем весь мир за один кадр.
+void StartNextLevel(Dungeon &dungeon, Player &player,
+                    std::vector<std::unique_ptr<Enemy>> &enemies, Door &door,
+                    std::vector<Potion> &potions, int level)
+{
+    dungeon.GenerateLevel(MAP_CELLS_WIDTH, MAP_CELLS_HEIGHT);
+    player.SpawnPlayerInRandomRoom(dungeon.rooms);
+    SpawnEnemies(enemies, dungeon.rooms, player);
 
     // дверь нового уровня меряем от нового игрока
     door.SpawnDoor(dungeon.rooms, player.xCellPlayer, player.yCellPlayer);
@@ -131,20 +144,9 @@ int main()
     Player player;
     player.SpawnPlayerInRandomRoom(dungeon.rooms);
 
-    Enemy enemy;
-    int spawnAttempts = 0;
-    int distance = 0;
-
-    do
-    {
-        enemy.SpawnEnemy(dungeon.rooms);
-        // Проверяем, не слишком ли близко к игроку
-        distance = std::abs(enemy.xCellEnemy - player.xCellPlayer) +
-                   std::abs(enemy.yCellEnemy - player.yCellPlayer);
-        spawnAttempts++;
-
-    } while (distance < 10 && spawnAttempts < 50);
-    // Если ближе 10 клеток — переспавниваем
+    // все враги уровня; указатели — задел под наследников (ищейка, шатун)
+    std::vector<std::unique_ptr<Enemy>> enemies;
+    SpawnEnemies(enemies, dungeon.rooms, player);
 
     // выход с уровня: ставится после спавна игрока, чтобы знать, от кого мерить дистанцию
     Door door;
@@ -342,7 +344,7 @@ int main()
                             // обычный переход: смена мира под чёрным
                             // номер растёт ДО генерации: зелья нового уровня считаются по его номеру
                             levelNumber++;
-                            StartNextLevel(dungeon, player, enemy, door, potions, levelNumber);
+                            StartNextLevel(dungeon, player, enemies, door, potions, levelNumber);
                             levelText.setString("Level: " + std::to_string(levelNumber));
                             switchDarkness = -1;
                         }
@@ -367,7 +369,7 @@ int main()
             hpText.setString("HP: " + std::to_string(player.hpPlayer));
             // сначала сброс номера, потом генерация: иначе первый уровень получит зелья уровня смерти
             levelNumber = 1;
-            StartNextLevel(dungeon, player, enemy, door, potions, levelNumber);
+            StartNextLevel(dungeon, player, enemies, door, potions, levelNumber);
             levelText.setString("Level: 1");
             gameOver = false;
             switchDarkness = -1;                 // осветляемся на новом уровне
@@ -376,13 +378,23 @@ int main()
 
         if (!freezeTime && enemyCooldown <= 0.0f)
         {
-            enemy.FindPlayer(player, dungeon);
+            for (const std::unique_ptr<Enemy> &enemy : enemies)
+            {
+                enemy->FindPlayer(player, dungeon);
+            }
             enemyCooldown = 0.15f;
         }
 
-        //проверяем, догнал ли враг игрока
-        bool enemyCatchesPlayer = (enemy.xCellEnemy == player.xCellPlayer
-            && enemy.yCellEnemy == player.yCellPlayer);
+        // проверяем, догнал ли игрока хотя бы один враг
+        bool enemyCatchesPlayer = false;
+        for (const std::unique_ptr<Enemy> &enemy : enemies)
+        {
+            if (enemy->xCellEnemy == player.xCellPlayer
+                && enemy->yCellEnemy == player.yCellPlayer)
+            {
+                enemyCatchesPlayer = true;
+            }
+        }
 
         // урон при поимке: враг стоит на клетке игрока — здоровье тратится
         // через CONTACT_DAMAGE_INTERVAL секунд, пока контакт не прервётся
@@ -474,7 +486,10 @@ int main()
 
         door.DrawDoor(window); // выход рисуем под юнитами: пол → дверь → игрок → враг
         player.DrawPlayer(window);
-        enemy.DrawEnemy(window);
+        for (const std::unique_ptr<Enemy> &enemy : enemies)
+        {
+            enemy->DrawEnemy(window);
+        }
 
         // частицы поверх юнитов — они часть мира, но «верх» по слоям
         for (const Particle &particle : particles)
