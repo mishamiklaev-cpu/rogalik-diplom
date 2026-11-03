@@ -12,6 +12,13 @@ const int MAX_HP_PLAYER = 100;
 // урон за поимку ищейкой: 4 поимки = 100 урона = конец игры
 const int DAMAGE_ON_CATCH = 25;
 
+// шатун: бьёт слабее ищейки
+const int DAMAGE_SHATUN = 20;
+
+// пауза между шагами врагов (секунды); игрок шагает раз в 0.1 с
+const float STEP_TIME_HOUND = 0.15f;
+const float STEP_TIME_SHATUN = 0.3f; // шатун вдвое медленнее ищейки — от него можно уйти
+
 // восстановление от зелья здоровья
 const int POTION_HEAL = 20;
 

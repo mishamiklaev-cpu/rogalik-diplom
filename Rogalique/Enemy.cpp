@@ -1,5 +1,6 @@
 #include "Enemy.h"
 #include "Constants.h"
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <queue>
@@ -11,12 +12,93 @@ Enemy::Enemy()
     widthEnemy = 1;
     heightEnemy = 1;
     colorEnemy = sf::Color::White; // наследник перекрасит в свой цвет
+    damageEnemy = DAMAGE_ON_CATCH;
+    stepTimeEnemy = STEP_TIME_HOUND;
+    stepTimerEnemy = 0.0f;
 }
 
 EnemyHound::EnemyHound()
 {
     // сначала уже отработал конструктор Enemy, здесь только своё
     colorEnemy = sf::Color::Magenta;
+    damageEnemy = DAMAGE_ON_CATCH;
+    stepTimeEnemy = STEP_TIME_HOUND;
+}
+
+EnemyShatun::EnemyShatun()
+{
+    colorEnemy = sf::Color(128, 128, 128); // серый
+    damageEnemy = DAMAGE_SHATUN;
+    stepTimeEnemy = STEP_TIME_SHATUN;
+}
+
+void EnemyShatun::FindPlayer(const Player &player, const Dungeon &dungeon, const Door &door)
+{
+    // уже стоит на клетке игрока — шагать некуда
+    if (xCellEnemy == player.xCellPlayer && yCellEnemy == player.yCellPlayer)
+    {
+        return;
+    }
+
+    int xDistance = player.xCellPlayer - xCellEnemy;
+    int yDistance = player.yCellPlayer - yCellEnemy;
+
+    // взгляд: идём по отрезку от шатуна к игроку равными шагами (по шагу на клетку
+    // вдоль длинной оси) и проверяем клетку под каждой точкой; стена — взгляд упёрся
+    int lookSteps = std::max(std::abs(xDistance), std::abs(yDistance));
+    for (int k = 1; k < lookSteps; k++)
+    {
+        int xCellLook = static_cast<int>(std::round(xCellEnemy + xDistance * k / static_cast<float>(lookSteps)));
+        int yCellLook = static_cast<int>(std::round(yCellEnemy + yDistance * k / static_cast<float>(lookSteps)));
+        if (dungeon.cell[yCellLook][xCellLook] == Tile::Wall)
+        {
+            return; // не видит — стоит
+        }
+    }
+
+    // видит — шаг к игроку, как у всех, только по четырём сторонам
+    int xDirection = 0;
+    int yDirection = 0;
+    if (xDistance > 0)
+    {
+        xDirection = 1;
+    }
+    else if (xDistance < 0)
+    {
+        xDirection = -1;
+    }
+    if (yDistance > 0)
+    {
+        yDirection = 1;
+    }
+    else if (yDistance < 0)
+    {
+        yDirection = -1;
+    }
+
+    // сначала по оси, где до игрока дальше; там стена или дверь — пробуем другую ось
+    if (std::abs(xDistance) >= std::abs(yDistance))
+    {
+        if (xDirection != 0 && CanMove(xDirection, 0, dungeon, door))
+        {
+            MoveEnemy(xDirection, 0);
+        }
+        else if (yDirection != 0 && CanMove(0, yDirection, dungeon, door))
+        {
+            MoveEnemy(0, yDirection);
+        }
+    }
+    else
+    {
+        if (yDirection != 0 && CanMove(0, yDirection, dungeon, door))
+        {
+            MoveEnemy(0, yDirection);
+        }
+        else if (xDirection != 0 && CanMove(xDirection, 0, dungeon, door))
+        {
+            MoveEnemy(xDirection, 0);
+        }
+    }
 }
 
 void Enemy::SetPositionEnemy(int x, int y)
@@ -30,8 +112,10 @@ void Enemy::SpawnEnemy(const std::vector<Room> &rooms)
     int randomRoom = rand() % rooms.size();
     const Room &chosenRoom = rooms[randomRoom];
 
-    xCellEnemy = chosenRoom.xRoom + (chosenRoom.widthRoom / 2);
-    yCellEnemy = chosenRoom.yRoom + (chosenRoom.heightRoom / 2);
+    // случайная клетка комнаты, а не центр: центров на всех не хватает
+    // (в центрах стоят игрок и дверь, а врагов на уровне до 7)
+    xCellEnemy = chosenRoom.xRoom + rand() % chosenRoom.widthRoom;
+    yCellEnemy = chosenRoom.yRoom + rand() % chosenRoom.heightRoom;
 };
 
 void Enemy::DrawEnemy(sf::RenderWindow &window)
@@ -43,7 +127,7 @@ void Enemy::DrawEnemy(sf::RenderWindow &window)
     window.draw(enemyShape);
 };
 
-void EnemyHound::FindPlayer(const Player &player, const Dungeon &dungeon)
+void EnemyHound::FindPlayer(const Player &player, const Dungeon &dungeon, const Door &door)
 {
     // направление искать уже не нужно
     if (xCellEnemy == player.xCellPlayer && yCellEnemy == player.yCellPlayer)
@@ -86,6 +170,10 @@ void EnemyHound::FindPlayer(const Player &player, const Dungeon &dungeon)
             {
                 continue; // в стену волна не льётся
             }
+            if (nx == door.xCellDoor && ny == door.yCellDoor)
+            {
+                continue; // через дверь враги не ходят — волна её обтекает
+            }
             if (dist[ny][nx] != -1)
             {
                 continue; // клетка уже отмечена 
@@ -103,9 +191,9 @@ void EnemyHound::FindPlayer(const Player &player, const Dungeon &dungeon)
 
     for (int i = 0; i < 4; i++)
     {
-        if (!CanMove(stepDx[i], stepDy[i], dungeon))
+        if (!CanMove(stepDx[i], stepDy[i], dungeon, door))
         {
-            continue; // в стену или за край — не ход
+            continue; // в стену, на дверь или за край — не ход
         }
 
         int ny = yCellEnemy + stepDy[i];
@@ -130,7 +218,7 @@ void EnemyHound::FindPlayer(const Player &player, const Dungeon &dungeon)
     }
 }
 
-bool Enemy::CanMove(int xDirection, int yDirection, const Dungeon &dungeon)
+bool Enemy::CanMove(int xDirection, int yDirection, const Dungeon &dungeon, const Door &door)
 {
     int newX = xCellEnemy + xDirection;
     int newY = yCellEnemy + yDirection;
@@ -145,10 +233,15 @@ bool Enemy::CanMove(int xDirection, int yDirection, const Dungeon &dungeon)
         return false;
     }
 
+    if (newX == door.xCellDoor && newY == door.yCellDoor)
+    {
+        return false; // дверь — выход только для игрока
+    }
+
     return true; 
 }
 
-// стену здесь не проверяем: шаг уже проверен в CanMove до вызова
+// стену и дверь здесь не проверяем: шаг уже проверен в CanMove до вызова
 void Enemy::MoveEnemy(int xDirection, int yDirection)
 {
     xCellEnemy += xDirection;
