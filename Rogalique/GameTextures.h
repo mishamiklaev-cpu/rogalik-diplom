@@ -10,6 +10,8 @@ class GameTextures
     bool wallLoaded = false; // файл не нашёлся — стена рисуется цветом, а не белым пятном
     sf::Texture floorTexture;
     bool floorLoaded = false;
+    sf::Texture doorTexture;
+    bool doorLoaded = false;
 
     void LoadTextures();
 };

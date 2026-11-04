@@ -598,7 +598,7 @@ int main()
             potion.DrawPotion(window);
         }
 
-        door.DrawDoor(window); // выход рисуем под юнитами: пол → дверь → игрок → враг
+        door.DrawDoor(window, textures); // выход рисуем под юнитами: пол → дверь → игрок → враг
         player.DrawPlayer(window);
         for (const std::unique_ptr<Enemy> &enemy : enemies)
         {

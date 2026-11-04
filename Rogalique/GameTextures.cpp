@@ -15,4 +15,5 @@ void GameTextures::LoadTextures()
 {
     wallLoaded = LoadTextureFile(wallTexture, "wall.png");
     floorLoaded = LoadTextureFile(floorTexture, "floor.png");
+    doorLoaded = LoadTextureFile(doorTexture, "door.png");
 }
