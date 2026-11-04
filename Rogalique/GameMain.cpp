@@ -595,7 +595,7 @@ int main()
         // зелья: лежат на полу, под юнитами (пол → зелья → дверь → игрок → враг)
         for (const Potion &potion : potions)
         {
-            potion.DrawPotion(window);
+            potion.DrawPotion(window, textures);
         }
 
         door.DrawDoor(window, textures); // выход рисуем под юнитами: пол → дверь → игрок → враг

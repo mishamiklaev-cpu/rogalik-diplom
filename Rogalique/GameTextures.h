@@ -12,6 +12,8 @@ class GameTextures
     bool floorLoaded = false;
     sf::Texture doorTexture;
     bool doorLoaded = false;
+    sf::Texture potionTexture;
+    bool potionLoaded = false;
 
     void LoadTextures();
 };
