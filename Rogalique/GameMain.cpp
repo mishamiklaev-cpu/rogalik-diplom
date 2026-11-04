@@ -599,7 +599,7 @@ int main()
         }
 
         door.DrawDoor(window, textures); // выход рисуем под юнитами: пол → дверь → игрок → враг
-        player.DrawPlayer(window);
+        player.DrawPlayer(window, textures);
         for (const std::unique_ptr<Enemy> &enemy : enemies)
         {
             enemy->DrawEnemy(window);

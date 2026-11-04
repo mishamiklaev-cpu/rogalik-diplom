@@ -14,6 +14,8 @@ class GameTextures
     bool doorLoaded = false;
     sf::Texture potionTexture;
     bool potionLoaded = false;
+    sf::Texture playerTexture; // спрайт-лист: 2 столбца (фазы бега), 4 ряда (направления)
+    bool playerLoaded = false;
 
     void LoadTextures();
 };
