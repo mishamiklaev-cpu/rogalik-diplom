@@ -28,6 +28,9 @@
     <ClCompile Include="Particle.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
+    <ClCompile Include="GameTextures.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Constants.h">
@@ -55,6 +58,9 @@
       <Filter>Sources</Filter>
     </ClInclude>
     <ClInclude Include="Particle.h">
+      <Filter>Sources</Filter>
+    </ClInclude>
+    <ClInclude Include="GameTextures.h">
       <Filter>Sources</Filter>
     </ClInclude>
   </ItemGroup>

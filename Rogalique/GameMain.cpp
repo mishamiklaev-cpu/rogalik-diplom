@@ -2,6 +2,7 @@
 #include "Door.h"
 #include "Dungeon.h"
 #include "Enemy.h"
+#include "GameTextures.h"
 #include "Particle.h"
 #include "Player.h"
 #include "Potion.h"
@@ -268,6 +269,10 @@ int main()
     sf::RectangleShape fadeShape(sf::Vector2f(static_cast<float>(WINDOW_WIDTH),
                                               static_cast<float>(WINDOW_HEIGHT)));
     fadeShape.setFillColor(sf::Color(0, 0, 0, 0));
+
+    // текстуры: загружаем один раз до игрового цикла, рисование только использует готовые
+    GameTextures textures;
+    textures.LoadTextures();
 
     // шрифт для игровой надписи и экрана смерти.
     sf::Font font;
@@ -585,7 +590,7 @@ int main()
 
         window.clear();
         window.setView(camera);
-        dungeon.Draw(window);
+        dungeon.Draw(window, textures);
 
         // зелья: лежат на полу, под юнитами (пол → зелья → дверь → игрок → враг)
         for (const Potion &potion : potions)
