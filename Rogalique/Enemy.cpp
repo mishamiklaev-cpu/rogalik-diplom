@@ -15,6 +15,8 @@ Enemy::Enemy()
     damageEnemy = DAMAGE_ON_CATCH;
     stepTimeEnemy = STEP_TIME_HOUND;
     stepTimerEnemy = 0.0f;
+    directionEnemy = Direction::Down;
+    frameEnemy = 0;
 }
 
 EnemyHound::EnemyHound()
@@ -118,14 +120,68 @@ void Enemy::SpawnEnemy(const std::vector<Room> &rooms)
     yCellEnemy = chosenRoom.yRoom + rand() % chosenRoom.heightRoom;
 };
 
-void Enemy::DrawEnemy(sf::RenderWindow &window)
+void Enemy::DrawEnemy(sf::RenderWindow &window, const GameTextures &textures)
 {
     sf::RectangleShape enemyShape;
     enemyShape.setSize(sf::Vector2f(widthEnemy * TILE_SIZE, heightEnemy * TILE_SIZE));
-    enemyShape.setFillColor(colorEnemy);
+
+    // какую картинку взять, решает вид врага: вызов виртуальной функции
+    const sf::Texture *texture = GetTextureEnemy(textures);
+    if (texture != nullptr)
+    {
+        // окошко в спрайт-лист: столбец — фаза шага, ряд — направление
+        int tileSize = static_cast<int>(TILE_SIZE);
+        enemyShape.setTexture(texture);
+        enemyShape.setTextureRect(sf::IntRect(frameEnemy * tileSize,
+                                              static_cast<int>(directionEnemy) * tileSize,
+                                              tileSize, tileSize));
+    }
+    else
+    {
+        enemyShape.setFillColor(colorEnemy);
+    }
     enemyShape.setPosition(sf::Vector2f(xCellEnemy * TILE_SIZE, yCellEnemy * TILE_SIZE));
     window.draw(enemyShape);
 };
+
+void Enemy::AnimateStepEnemy(int xCellOld, int yCellOld)
+{
+    if (xCellEnemy > xCellOld)
+    {
+        directionEnemy = Direction::Right;
+    }
+    else if (xCellEnemy < xCellOld)
+    {
+        directionEnemy = Direction::Left;
+    }
+    else if (yCellEnemy > yCellOld)
+    {
+        directionEnemy = Direction::Down;
+    }
+    else if (yCellEnemy < yCellOld)
+    {
+        directionEnemy = Direction::Up;
+    }
+    else
+    {
+        return; // шага не было или его отменили — поза не меняется
+    }
+    frameEnemy = 1 - frameEnemy;
+}
+
+const sf::Texture *EnemyHound::GetTextureEnemy(const GameTextures &textures) const
+{
+    return nullptr; // картинки ищейки пока нет
+}
+
+const sf::Texture *EnemyShatun::GetTextureEnemy(const GameTextures &textures) const
+{
+    if (textures.shatunLoaded)
+    {
+        return &textures.shatunTexture;
+    }
+    return nullptr;
+}
 
 void EnemyHound::FindPlayer(const Player &player, const Dungeon &dungeon, const Door &door)
 {

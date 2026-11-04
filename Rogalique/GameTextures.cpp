@@ -18,4 +18,5 @@ void GameTextures::LoadTextures()
     doorLoaded = LoadTextureFile(doorTexture, "door.png");
     potionLoaded = LoadTextureFile(potionTexture, "potion.png");
     playerLoaded = LoadTextureFile(playerTexture, "player.png");
+    shatunLoaded = LoadTextureFile(shatunTexture, "shatun.png");
 }

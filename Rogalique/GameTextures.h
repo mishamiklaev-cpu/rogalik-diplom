@@ -16,6 +16,8 @@ class GameTextures
     bool potionLoaded = false;
     sf::Texture playerTexture; // спрайт-лист: 2 столбца (фазы бега), 4 ряда (направления)
     bool playerLoaded = false;
+    sf::Texture shatunTexture; // спрайт-лист как у игрока
+    bool shatunLoaded = false;
 
     void LoadTextures();
 };

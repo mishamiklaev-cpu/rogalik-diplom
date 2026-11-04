@@ -488,6 +488,8 @@ int main()
                             enemies[i]->SetPositionEnemy(xCellOld, yCellOld);
                         }
                     }
+                    // только теперь известно, состоялся ли шаг: сначала проверка, потом анимация
+                    enemies[i]->AnimateStepEnemy(xCellOld, yCellOld);
                     enemies[i]->stepTimerEnemy = enemies[i]->stepTimeEnemy;
                 }
             }
@@ -602,7 +604,7 @@ int main()
         player.DrawPlayer(window, textures);
         for (const std::unique_ptr<Enemy> &enemy : enemies)
         {
-            enemy->DrawEnemy(window);
+            enemy->DrawEnemy(window, textures);
         }
 
         // частицы поверх юнитов — они часть мира, но «верх» по слоям
