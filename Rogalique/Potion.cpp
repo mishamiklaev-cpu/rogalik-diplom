@@ -10,9 +10,19 @@ void Potion::SpawnPotion(const std::vector<Room> &rooms)
     yPotion = chosenRoom.yRoom + (chosenRoom.heightRoom / 2);
 }
 
-void Potion::DrawPotion(sf::RenderWindow &window) const
+void Potion::DrawPotion(sf::RenderWindow &window, const GameTextures &textures) const
 {
-    // зелье меньше игрока и врага: квадрат в полклетки,
+    if (textures.potionLoaded)
+    {
+        // картинка на всю клетку: поля вокруг фляжки прозрачные, сквозь них виден пол
+        sf::RectangleShape potionShape(sf::Vector2f(TILE_SIZE, TILE_SIZE));
+        potionShape.setTexture(&textures.potionTexture);
+        potionShape.setPosition(xPotion * TILE_SIZE, yPotion * TILE_SIZE);
+        window.draw(potionShape);
+        return;
+    }
+
+    // файла нет: квадрат в полклетки,
     // нарисован в центре своей клетки
     sf::RectangleShape potionShape(sf::Vector2f(TILE_SIZE / 2.f, TILE_SIZE / 2.f));
     potionShape.setFillColor(sf::Color(240, 180, 40)); // золотистая фляжка

@@ -2,6 +2,7 @@
 #include "Door.h"
 #include "Dungeon.h"
 #include "Enemy.h"
+#include "GameTextures.h"
 #include "Particle.h"
 #include "Player.h"
 #include "Potion.h"
@@ -269,6 +270,10 @@ int main()
                                               static_cast<float>(WINDOW_HEIGHT)));
     fadeShape.setFillColor(sf::Color(0, 0, 0, 0));
 
+    // текстуры: загружаем один раз до игрового цикла, рисование только использует готовые
+    GameTextures textures;
+    textures.LoadTextures();
+
     // шрифт для игровой надписи и экрана смерти.
     sf::Font font;
     bool fontLoaded = font.loadFromFile("Fonts/Roboto-Black.ttf");
@@ -471,7 +476,7 @@ int main()
                 {
                     int xCellOld = enemies[i]->xCellEnemy;
                     int yCellOld = enemies[i]->yCellEnemy;
-                    enemies[i]->FindPlayer(player, dungeon, door);
+                    enemies[i]->FindPlayer(player, dungeon, door, enemies);
 
                     // клетка занята другим врагом — шаг отменяется: враги не
                     // накладываются друг на друга (и на игроке стоит только один)
@@ -483,6 +488,8 @@ int main()
                             enemies[i]->SetPositionEnemy(xCellOld, yCellOld);
                         }
                     }
+                    // только теперь известно, состоялся ли шаг: сначала проверка, потом анимация
+                    enemies[i]->AnimateStepEnemy(xCellOld, yCellOld);
                     enemies[i]->stepTimerEnemy = enemies[i]->stepTimeEnemy;
                 }
             }
@@ -585,19 +592,19 @@ int main()
 
         window.clear();
         window.setView(camera);
-        dungeon.Draw(window);
+        dungeon.Draw(window, textures);
 
         // зелья: лежат на полу, под юнитами (пол → зелья → дверь → игрок → враг)
         for (const Potion &potion : potions)
         {
-            potion.DrawPotion(window);
+            potion.DrawPotion(window, textures);
         }
 
-        door.DrawDoor(window); // выход рисуем под юнитами: пол → дверь → игрок → враг
-        player.DrawPlayer(window);
+        door.DrawDoor(window, textures); // выход рисуем под юнитами: пол → дверь → игрок → враг
+        player.DrawPlayer(window, textures);
         for (const std::unique_ptr<Enemy> &enemy : enemies)
         {
-            enemy->DrawEnemy(window);
+            enemy->DrawEnemy(window, textures);
         }
 
         // частицы поверх юнитов — они часть мира, но «верх» по слоям

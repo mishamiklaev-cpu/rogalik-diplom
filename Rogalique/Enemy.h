@@ -4,6 +4,7 @@
 #include "Player.h"
 #include "Room.h"
 #include <SFML/Graphics.hpp>
+#include <memory>
 #include <vector>
 
 // базовый враг: общее для всех видов — клетка, спавн, отрисовка, шаг.
@@ -23,14 +24,22 @@ class Enemy
     int damageEnemy;      // урон за удар
     float stepTimeEnemy;  // пауза между шагами: чем больше, тем медленнее вид
     float stepTimerEnemy; // сколько осталось до следующего шага
+    Direction directionEnemy; // куда смотрит: выбирает ряд в спрайт-листе
+    int frameEnemy;           // фаза шага, 0 или 1: выбирает столбец
+    bool isObstacleEnemy;     // считает ли волна ищейки этого врага препятствием
 
     // поставить на заданную клетку: откат шага на занятую клетку, задел под «продолжить игру»
     void SetPositionEnemy(int xCellEnemy, int yCellEnemy);
     void SpawnEnemy(const std::vector<Room> &rooms);
-    void DrawEnemy(sf::RenderWindow &window);
+    void DrawEnemy(sf::RenderWindow &window, const GameTextures &textures);
+    // у каждого вида своя картинка; nullptr — картинки нет, рисуем цветом colorEnemy
+    virtual const sf::Texture *GetTextureEnemy(const GameTextures &textures) const = 0;
+    // вызывается после всех проверок шага: сдвинулся с прежней клетки — повернуть и сменить кадр
+    void AnimateStepEnemy(int xCellOld, int yCellOld);
     // чисто виртуальная (= 0): своего поиска у базового врага нет, поэтому
     // просто Enemy создать нельзя — только конкретный вид
-    virtual void FindPlayer(const Player &player, const Dungeon &dungeon, const Door &door) = 0;
+    virtual void FindPlayer(const Player &player, const Dungeon &dungeon, const Door &door,
+                            const std::vector<std::unique_ptr<Enemy>> &enemies) = 0;
     // шаг возможен, если клетка на карте, не стена и не дверь (дверь только для игрока)
     bool CanMove(int xDirection, int yDirection, const Dungeon &dungeon, const Door &door);
     void MoveEnemy(int xDirection, int yDirection);
@@ -41,7 +50,9 @@ class EnemyHound : public Enemy
 {
   public:
     EnemyHound();
-    void FindPlayer(const Player &player, const Dungeon &dungeon, const Door &door) override;
+    void FindPlayer(const Player &player, const Dungeon &dungeon, const Door &door,
+                    const std::vector<std::unique_ptr<Enemy>> &enemies) override;
+    const sf::Texture *GetTextureEnemy(const GameTextures &textures) const override;
 };
 
 // шатун: видит игрока по прямой под любым углом, если на линии нет стен;
@@ -50,5 +61,8 @@ class EnemyShatun : public Enemy
 {
   public:
     EnemyShatun();
-    void FindPlayer(const Player &player, const Dungeon &dungeon, const Door &door) override;
+    // список врагов шатуну не нужен, но сигнатура у всех наследников обязана совпадать
+    void FindPlayer(const Player &player, const Dungeon &dungeon, const Door &door,
+                    const std::vector<std::unique_ptr<Enemy>> &enemies) override;
+    const sf::Texture *GetTextureEnemy(const GameTextures &textures) const override;
 };

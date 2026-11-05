@@ -137,7 +137,7 @@ void Dungeon::CarveCorridor(int xRoomCentr1, int yRoomCentr1, int xRoomCentr2, i
     }
 }
 
-void Dungeon::Draw(sf::RenderWindow &window)
+void Dungeon::Draw(sf::RenderWindow &window, const GameTextures &textures)
 {
     for (int yField = 0; yField < heightField; yField++)
     {
@@ -150,11 +150,33 @@ void Dungeon::Draw(sf::RenderWindow &window)
 
             if (cell[yField][xField] == Tile::Wall)
             {
-                objectField.setFillColor(sf::Color::Red);
+                if (textures.wallLoaded)
+                {
+                    // цвет заливки не задаём: он белый и не меняет цвета картинки
+                    objectField.setTexture(&textures.wallTexture);
+
+                    // в клетке только кусок картинки: остаток от деления выбирает какой,
+                    // поэтому кладка идёт через всю карту без стыков
+                    int tileSize = static_cast<int>(TILE_SIZE);
+                    objectField.setTextureRect(sf::IntRect(xField % WALL_TEXTURE_CELLS * tileSize,
+                                                           yField % WALL_TEXTURE_CELLS * tileSize,
+                                                           tileSize, tileSize));
+                }
+                else
+                {
+                    objectField.setFillColor(sf::Color::Red);
+                }
             }
             else if (cell[yField][xField] == Tile::Floor)
             {
-                objectField.setFillColor(sf::Color::White);
+                if (textures.floorLoaded)
+                {
+                    objectField.setTexture(&textures.floorTexture);
+                }
+                else
+                {
+                    objectField.setFillColor(sf::Color::White);
+                }
             }
             window.draw(objectField);
         }

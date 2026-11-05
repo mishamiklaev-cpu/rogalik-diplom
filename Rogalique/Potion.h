@@ -1,10 +1,11 @@
 #pragma once
 #include "Constants.h"
+#include "GameTextures.h"
 #include "Room.h"
 #include <SFML/Graphics.hpp>
 #include <vector>
 
-// зелье здоровья: маленькая золотая фляжка на полу.
+// зелье здоровья: зелёная фляжка на полу.
 // Появляется в случайной комнате; выпил — восстановил здоровье
 class Potion
 {
@@ -13,5 +14,5 @@ class Potion
     int yPotion;
 
     void SpawnPotion(const std::vector<Room> &rooms);
-    void DrawPotion(sf::RenderWindow &window) const; // рисование не меняет зелье
+    void DrawPotion(sf::RenderWindow &window, const GameTextures &textures) const; // рисование не меняет зелье
 };

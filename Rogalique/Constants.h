@@ -6,6 +6,9 @@ const float TILE_SIZE = 40.f;
 const int MAP_CELLS_WIDTH = 40;
 const int MAP_CELLS_HEIGHT = 30;
 
+// картинка стены растянута на 2х2 клетки: так кирпичи крупнее и лучше читаются
+const int WALL_TEXTURE_CELLS = 2;
+
 // полное здоровье игрока: старт, рестарт и потолок лечения зельем
 const int MAX_HP_PLAYER = 100;
 

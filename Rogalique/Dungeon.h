@@ -1,4 +1,5 @@
 #pragma once
+#include "GameTextures.h"
 #include "Room.h"
 #include "Tile.h"
 #include <SFML/Graphics.hpp>
@@ -18,5 +19,5 @@ class Dungeon
     void GenerateLevel(int widthMap, int heightMap);
     void CarveRoom(const Room &room);
     void CarveCorridor(int xRoomCentr1, int yRoomCentr1, int xRoomCentr2, int yRoom2Centr2);
-    void Draw(sf::RenderWindow &window);
+    void Draw(sf::RenderWindow &window, const GameTextures &textures);
 };
