@@ -222,6 +222,8 @@ int main()
 
     // генератор окна
     sf::RenderWindow window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Dungeon Escape");
+    // удержание клавиши не присылает повторов: одно нажатие — одно событие KeyPressed
+    window.setKeyRepeatEnabled(false);
 
     // создаем объект Dungeon: уровень собирается одним методом класса
     Dungeon dungeon;
@@ -323,6 +325,18 @@ int main()
     // что сейчас происходит в игре
     GameState gameState = GameState::Playing;
 
+    // экран паузы: полупрозрачная пелена, поверх неё надписи по центру окна
+    sf::RectangleShape pauseShape(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT));
+    pauseShape.setFillColor(sf::Color(0, 0, 0, 150));
+
+    sf::Text pauseTitle("Pause", font, 60);
+    pauseTitle.setFillColor(sf::Color::White);
+    pauseTitle.setPosition((WINDOW_WIDTH - pauseTitle.getGlobalBounds().width) / 2.0f, 220.f);
+
+    sf::Text pauseText("Press Esc to Continue", font, 28);
+    pauseText.setFillColor(sf::Color::White);
+    pauseText.setPosition((WINDOW_WIDTH - pauseText.getGlobalBounds().width) / 2.0f, 300.f);
+
     // смерть и рестарт
     bool gameOver = false;
     float contactDamageTimer = 0.0f;   // пауза между ударами, пока враг стоит на игроке
@@ -334,6 +348,20 @@ int main()
             if (event.type == sf::Event::Closed)
             {
                 window.close();
+            }
+
+            // Esc — событие, а не isKeyPressed: иначе пауза мигала бы каждый кадр, пока клавиша нажата.
+            // На экране смерти пауза не нужна: мир и так стоит
+            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Escape && !gameOver)
+            {
+                if (gameState == GameState::Playing)
+                {
+                    gameState = GameState::Paused;
+                }
+                else if (gameState == GameState::Paused)
+                {
+                    gameState = GameState::Playing;
+                }
             }
         }
 
@@ -657,6 +685,16 @@ int main()
             window.draw(gameOverTitle);
             window.draw(gameOverStats);
             window.draw(gameOverText);
+        }
+
+        if (gameState == GameState::Paused)
+        {
+            window.draw(pauseShape);
+            if (fontLoaded)
+            {
+                window.draw(pauseTitle);
+                window.draw(pauseText);
+            }
         }
 
         window.display();
