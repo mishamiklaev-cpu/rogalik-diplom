@@ -17,6 +17,7 @@ Enemy::Enemy()
     stepTimerEnemy = 0.0f;
     directionEnemy = Direction::Down;
     frameEnemy = 0;
+    isObstacleEnemy = true;
 }
 
 EnemyHound::EnemyHound()
@@ -25,6 +26,7 @@ EnemyHound::EnemyHound()
     colorEnemy = sf::Color::Magenta;
     damageEnemy = DAMAGE_ON_CATCH;
     stepTimeEnemy = STEP_TIME_HOUND;
+    isObstacleEnemy = false; // ищейки не перекрывают путь друг другу
 }
 
 EnemyShatun::EnemyShatun()
@@ -34,7 +36,8 @@ EnemyShatun::EnemyShatun()
     stepTimeEnemy = STEP_TIME_SHATUN;
 }
 
-void EnemyShatun::FindPlayer(const Player &player, const Dungeon &dungeon, const Door &door)
+void EnemyShatun::FindPlayer(const Player &player, const Dungeon &dungeon, const Door &door,
+                             const std::vector<std::unique_ptr<Enemy>> &enemies)
 {
     // уже стоит на клетке игрока — шагать некуда
     if (xCellEnemy == player.xCellPlayer && yCellEnemy == player.yCellPlayer)
@@ -171,7 +174,11 @@ void Enemy::AnimateStepEnemy(int xCellOld, int yCellOld)
 
 const sf::Texture *EnemyHound::GetTextureEnemy(const GameTextures &textures) const
 {
-    return nullptr; // картинки ищейки пока нет
+    if (textures.houndLoaded)
+    {
+        return &textures.houndTexture;
+    }
+    return nullptr;
 }
 
 const sf::Texture *EnemyShatun::GetTextureEnemy(const GameTextures &textures) const
@@ -183,7 +190,8 @@ const sf::Texture *EnemyShatun::GetTextureEnemy(const GameTextures &textures) co
     return nullptr;
 }
 
-void EnemyHound::FindPlayer(const Player &player, const Dungeon &dungeon, const Door &door)
+void EnemyHound::FindPlayer(const Player &player, const Dungeon &dungeon, const Door &door,
+                            const std::vector<std::unique_ptr<Enemy>> &enemies)
 {
     // направление искать уже не нужно
     if (xCellEnemy == player.xCellPlayer && yCellEnemy == player.yCellPlayer)
@@ -199,6 +207,16 @@ void EnemyHound::FindPlayer(const Player &player, const Dungeon &dungeon, const 
 
     std::vector<std::vector<int>> dist(heightField, std::vector<int>(widthField, -1)); //30 строк, 40 столбцов
     std::queue<std::pair<int, int>> waveCell; // очередь: клетки, откуда волна пойдёт дальше
+
+    // враги-препятствия (не ищейки) для волны как стены: dist = -2 значит "клетка занята".
+    // В комнате ищейка обегает врага, а в узком коридоре ждёт: это передышка для игрока
+    for (const std::unique_ptr<Enemy> &enemy : enemies)
+    {
+        if (enemy->isObstacleEnemy)
+        {
+            dist[enemy->yCellEnemy][enemy->xCellEnemy] = -2;
+        }
+    }
 
     dist[player.yCellPlayer][player.xCellPlayer] = 0;//позиция игрока 
     waveCell.push({ player.xCellPlayer, player.yCellPlayer });//суем его в fifo 
@@ -232,7 +250,7 @@ void EnemyHound::FindPlayer(const Player &player, const Dungeon &dungeon, const 
             }
             if (dist[ny][nx] != -1)
             {
-                continue; // клетка уже отмечена 
+                continue; // клетка уже отмечена или занята врагом
             }
 
             dist[ny][nx] = dist[pairXYCell.second][pairXYCell.first] + 1;//преписан шаг расстояния 
@@ -255,9 +273,9 @@ void EnemyHound::FindPlayer(const Player &player, const Dungeon &dungeon, const 
         int ny = yCellEnemy + stepDy[i];
         int nx = xCellEnemy + stepDx[i];
 
-        if (dist[ny][nx] == -1)
+        if (dist[ny][nx] < 0)
         {
-            continue; // клетка в закрытой зоне — до него нет пути вообще
+            continue; // волна сюда не дошла или клетка занята врагом — не ход
         }
 
         if (bestStep == -1 || dist[ny][nx] < bestStep)

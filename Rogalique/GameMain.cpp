@@ -476,7 +476,7 @@ int main()
                 {
                     int xCellOld = enemies[i]->xCellEnemy;
                     int yCellOld = enemies[i]->yCellEnemy;
-                    enemies[i]->FindPlayer(player, dungeon, door);
+                    enemies[i]->FindPlayer(player, dungeon, door, enemies);
 
                     // клетка занята другим врагом — шаг отменяется: враги не
                     // накладываются друг на друга (и на игроке стоит только один)

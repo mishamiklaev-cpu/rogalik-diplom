@@ -18,6 +18,8 @@ class GameTextures
     bool playerLoaded = false;
     sf::Texture shatunTexture; // спрайт-лист как у игрока
     bool shatunLoaded = false;
+    sf::Texture houndTexture; // спрайт-лист как у игрока
+    bool houndLoaded = false;
 
     void LoadTextures();
 };
