@@ -13,6 +13,14 @@
 #include <string>
 #include <vector>
 
+// одно поле вместо набора bool: два состояния сразу быть не может
+enum class GameState
+{
+    Menu,
+    Playing,
+    Paused
+};
+
 // вспышка частиц из точки события:
 // разлёт в случайные стороны, позиции слегка разбросаны вокруг точки
 void SpawnBurst(std::vector<Particle> &particles, float xPoint, float yPoint,
@@ -312,6 +320,9 @@ int main()
     panelShape.setPosition(0.f, 0.f);
     panelShape.setFillColor(sf::Color(30, 30, 30));
 
+    // что сейчас происходит в игре
+    GameState gameState = GameState::Playing;
+
     // смерть и рестарт
     bool gameOver = false;
     float contactDamageTimer = 0.0f;   // пауза между ударами, пока враг стоит на игроке
@@ -326,230 +337,239 @@ int main()
             }
         }
 
+        // часы перезапускаем в любом состоянии: иначе после паузы deltaTime
+        // окажется равен всей её длине и таймеры сработают разом
         float deltaTime = clock.restart().asSeconds();
-        moveCooldown -= deltaTime;
 
-        if (!freezeTime && moveCooldown <= 0.0f)
-        {
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::W))
-            {
-                player.MovePlayer(0, -1, dungeon);
-                moveCooldown = 0.1f;
-            }
-            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::S))
-            {
-                player.MovePlayer(0, 1, dungeon);
-                moveCooldown = 0.1f;
-            }
-            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::A))
-            {
-                player.MovePlayer(-1, 0, dungeon);
-                moveCooldown = 0.1f;
-            }
-            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::D))
-            {
-                player.MovePlayer(1, 0, dungeon);
-                moveCooldown = 0.1f;
-            }
-        }
+        // объявлено снаружи: тряска камеры ниже читает его в любом состоянии
+        bool enemyCatchesPlayer = false;
 
-        // подбор зелья: игрок встал на клетку зелья — здоровье растёт,
-        // но не выше MAX_HP_PLAYER; зелье извлекается из вектора
-        for (int i = 0; i < potions.size(); i++)
+        // игровая логика идёт только в состоянии Playing
+        if (gameState == GameState::Playing)
         {
-            if (player.xCellPlayer == potions[i].xPotion
-                && player.yCellPlayer == potions[i].yPotion)
+            moveCooldown -= deltaTime;
+
+            if (!freezeTime && moveCooldown <= 0.0f)
             {
-                int healAmount = POTION_HEAL;
-                if (player.hpPlayer + POTION_HEAL > MAX_HP_PLAYER)
+                if (sf::Keyboard::isKeyPressed(sf::Keyboard::W))
                 {
-                    healAmount = MAX_HP_PLAYER - player.hpPlayer; // лечим только до полного
+                    player.MovePlayer(0, -1, dungeon);
+                    moveCooldown = 0.1f;
                 }
-                player.hpPlayer += healAmount;
-                hpText.setString("HP: " + std::to_string(player.hpPlayer));
+                else if (sf::Keyboard::isKeyPressed(sf::Keyboard::S))
+                {
+                    player.MovePlayer(0, 1, dungeon);
+                    moveCooldown = 0.1f;
+                }
+                else if (sf::Keyboard::isKeyPressed(sf::Keyboard::A))
+                {
+                    player.MovePlayer(-1, 0, dungeon);
+                    moveCooldown = 0.1f;
+                }
+                else if (sf::Keyboard::isKeyPressed(sf::Keyboard::D))
+                {
+                    player.MovePlayer(1, 0, dungeon);
+                    moveCooldown = 0.1f;
+                }
+            }
 
-                // зелёная вспышка в момент выпитого зелья
+            // подбор зелья: игрок встал на клетку зелья — здоровье растёт,
+            // но не выше MAX_HP_PLAYER; зелье извлекается из вектора
+            for (int i = 0; i < potions.size(); i++)
+            {
+                if (player.xCellPlayer == potions[i].xPotion
+                    && player.yCellPlayer == potions[i].yPotion)
+                {
+                    int healAmount = POTION_HEAL;
+                    if (player.hpPlayer + POTION_HEAL > MAX_HP_PLAYER)
+                    {
+                        healAmount = MAX_HP_PLAYER - player.hpPlayer; // лечим только до полного
+                    }
+                    player.hpPlayer += healAmount;
+                    hpText.setString("HP: " + std::to_string(player.hpPlayer));
+
+                    // зелёная вспышка в момент выпитого зелья
+                    SpawnBurst(particles,
+                               static_cast<float>(player.xCellPlayer * TILE_SIZE) + TILE_SIZE / 2.0f,
+                               static_cast<float>(player.yCellPlayer * TILE_SIZE) + TILE_SIZE / 2.0f,
+                               sf::Color(30, 220, 60));
+
+                    potions.erase(potions.begin() + i);
+                    i--; 
+                }
+            }
+
+            // игрок встал на выход — переход запускается один раз и дальше идёт по таймеру
+            if (!freezeTime && player.xCellPlayer == door.xCellDoor && player.yCellPlayer == door.yCellDoor)
+            {
+                freezeTime = true;
+                freezeTimeTimer = 3.0f;
+            }
+
+            // жизнь частиц: двигаем всех, затем мёртвых убираем из вектора
+            for (int i = 0; i < particles.size(); i++)
+            {
+                particles[i].UpdateParticle(deltaTime);
+                if (particles[i].lifeParticle <= 0.0f)
+                {
+                    particles.erase(particles.begin() + i);
+                    i--; // после erase не пропустить следующую частицу
+                }
+            }
+
+            if (freezeTime)
+            {
+                if (freezeTimeTimer > 0.0f)
+                {
+                    // фаза 1: пауза под будущую музыку перехода, мир заморожен
+                    freezeTimeTimer -= deltaTime;
+                    if (freezeTimeTimer <= 0.0f)
+                    {
+                        switchDarkness = 1; // пауза кончилась — начинаем затемнение
+                        fadeStep= FADE_STEP_TIME;
+                    }
+                }
+                else
+                {
+                    // фаза 2/3: ступени затемнения, смена мира под чёрным, осветление
+                    fadeStep-= deltaTime;
+                    if (fadeStep<= 0.0f)
+                    {
+                        if (gameOver)
+                        {
+                            fadeStep= GAMEOVER_FADE_STEP_TIME; // смерть темнеет медленно
+                        }
+                        else
+                        {
+                            fadeStep= FADE_STEP_TIME;           // переход — в обычном темпе
+                        }
+                        fadeBlack+= switchDarkness * FADE_STEP;
+
+                        if (fadeBlack>= 255.0f)
+                        {
+                            // экран полностью чёрный — глаз не видит подмены
+                            fadeBlack= 255.0f;
+                            if (!gameOver)
+                            {
+                                // обычный переход: смена мира под чёрным
+                                // номер растёт ДО генерации: зелья нового уровня считаются по его номеру
+                                levelNumber++;
+                                StartNextLevel(dungeon, player, enemies, door, potions, levelNumber);
+                                levelText.setString("Level: " + std::to_string(levelNumber));
+                                switchDarkness = -1;
+                            }
+                            // при gameOver чёрный экран просто держится —
+                            // пробел проверяется отдельно, каждый кадр (ниже)
+                        }
+                        else if (fadeBlack<= 0.0f)
+                        {
+                            fadeBlack= 0.0f;
+                            switchDarkness = 0;
+                            freezeTime = false; // переход завершён
+                        }
+                    }
+                }
+            }
+
+            // рестарт на экране смерти: проверяем ПРОБЕЛ каждый кадр
+            if (gameOver && fadeBlack >= 255.0f &&
+                sf::Keyboard::isKeyPressed(sf::Keyboard::Space))
+            {
+                player.hpPlayer = MAX_HP_PLAYER;
+                hpText.setString("HP: " + std::to_string(player.hpPlayer));
+                // сначала сброс номера, потом генерация: иначе первый уровень получит зелья уровня смерти
+                levelNumber = 1;
+                StartNextLevel(dungeon, player, enemies, door, potions, levelNumber);
+                levelText.setString("Level: 1");
+                gameOver = false;
+                switchDarkness = -1;                 // осветляемся на новом уровне
+                fadeStep = GAMEOVER_FADE_STEP_TIME;  // первая ступень осветления через 0.5 с, дальше обычный темп (gameOver уже false)
+            }
+
+            // у каждого врага свой таймер шага: шатун ходит реже ищейки
+            if (!freezeTime)
+            {
+                for (int i = 0; i < enemies.size(); i++)
+                {
+                    enemies[i]->stepTimerEnemy -= deltaTime;
+                    if (enemies[i]->stepTimerEnemy <= 0.0f)
+                    {
+                        int xCellOld = enemies[i]->xCellEnemy;
+                        int yCellOld = enemies[i]->yCellEnemy;
+                        enemies[i]->FindPlayer(player, dungeon, door, enemies);
+
+                        // клетка занята другим врагом — шаг отменяется: враги не
+                        // накладываются друг на друга (и на игроке стоит только один)
+                        for (int j = 0; j < enemies.size(); j++)
+                        {
+                            if (j != i && enemies[i]->xCellEnemy == enemies[j]->xCellEnemy
+                                && enemies[i]->yCellEnemy == enemies[j]->yCellEnemy)
+                            {
+                                enemies[i]->SetPositionEnemy(xCellOld, yCellOld);
+                            }
+                        }
+                        // только теперь известно, состоялся ли шаг: сначала проверка, потом анимация
+                        enemies[i]->AnimateStepEnemy(xCellOld, yCellOld);
+                        enemies[i]->stepTimerEnemy = enemies[i]->stepTimeEnemy;
+                    }
+                }
+            }
+
+            // проверяем, догнал ли игрока враг; на клетке игрока стоит максимум один
+            // (шаг на занятую клетку отменяется), бьёт он своим уроном
+            int damageCatch = 0;
+            for (const std::unique_ptr<Enemy> &enemy : enemies)
+            {
+                if (enemy->xCellEnemy == player.xCellPlayer
+                    && enemy->yCellEnemy == player.yCellPlayer)
+                {
+                    enemyCatchesPlayer = true;
+                    if (enemy->damageEnemy > damageCatch)
+                    {
+                        damageCatch = enemy->damageEnemy;
+                    }
+                }
+            }
+
+            // урон при поимке: враг стоит на клетке игрока — здоровье тратится
+            // через CONTACT_DAMAGE_INTERVAL секунд, пока контакт не прервётся
+            contactDamageTimer -= deltaTime; // тик таймера урона (каждый кадр)
+
+            if (enemyCatchesPlayer && !gameOver && contactDamageTimer <= 0.0f)
+            {
+                player.hpPlayer -= damageCatch;
+                // после зелья HP не кратно урону и может уйти в минус: на панели показываем 0
+                if (player.hpPlayer < 0)
+                {
+                    player.hpPlayer = 0;
+                }
+                hpText.setString("HP: " + std::to_string(player.hpPlayer));
+                contactDamageTimer = CONTACT_DAMAGE_INTERVAL; // пауза до следующего удара
+
+                // красные искры из центра клетки удара
                 SpawnBurst(particles,
                            static_cast<float>(player.xCellPlayer * TILE_SIZE) + TILE_SIZE / 2.0f,
                            static_cast<float>(player.yCellPlayer * TILE_SIZE) + TILE_SIZE / 2.0f,
-                           sf::Color(30, 220, 60));
+                           sf::Color(220, 30, 30));
 
-                potions.erase(potions.begin() + i);
-                i--; 
-            }
-        }
-
-        // игрок встал на выход — переход запускается один раз и дальше идёт по таймеру
-        if (!freezeTime && player.xCellPlayer == door.xCellDoor && player.yCellPlayer == door.yCellDoor)
-        {
-            freezeTime = true;
-            freezeTimeTimer = 3.0f;
-        }
-
-        // жизнь частиц: двигаем всех, затем мёртвых убираем из вектора
-        for (int i = 0; i < particles.size(); i++)
-        {
-            particles[i].UpdateParticle(deltaTime);
-            if (particles[i].lifeParticle <= 0.0f)
-            {
-                particles.erase(particles.begin() + i);
-                i--; // после erase не пропустить следующую частицу
-            }
-        }
-
-        if (freezeTime)
-        {
-            if (freezeTimeTimer > 0.0f)
-            {
-                // фаза 1: пауза под будущую музыку перехода, мир заморожен
-                freezeTimeTimer -= deltaTime;
-                if (freezeTimeTimer <= 0.0f)
+                if (player.hpPlayer <= 0)
                 {
-                    switchDarkness = 1; // пауза кончилась — начинаем затемнение
-                    fadeStep= FADE_STEP_TIME;
+                    // смерть: замороженное медленное затемнение
+                    gameOver = true;
+                    freezeTime = true;
+                    freezeTimeTimer = 0.0f;              // без 3-секундной паузы
+                    switchDarkness = 1;                   // сразу темнеем
+                    fadeStep = GAMEOVER_FADE_STEP_TIME;   // но медленно: шаг за 0.5 с
+
+                    // счёт пройденных уровней: умерли на levelNumber —
+                    // значит, завершили levelNumber − 1
+                    gameOverStats.setString("Levels passed: " + std::to_string(levelNumber - 1));
+
+                    // центрируем все три надписи по горизонтали (по ширине каждой)
+                    gameOverTitle.setPosition((WINDOW_WIDTH - gameOverTitle.getGlobalBounds().width) / 2.0f, 200.f);
+                    gameOverStats.setPosition((WINDOW_WIDTH - gameOverStats.getGlobalBounds().width) / 2.0f, 280.f);
+                    gameOverText.setPosition((WINDOW_WIDTH - gameOverText.getGlobalBounds().width) / 2.0f, 330.f);
                 }
-            }
-            else
-            {
-                // фаза 2/3: ступени затемнения, смена мира под чёрным, осветление
-                fadeStep-= deltaTime;
-                if (fadeStep<= 0.0f)
-                {
-                    if (gameOver)
-                    {
-                        fadeStep= GAMEOVER_FADE_STEP_TIME; // смерть темнеет медленно
-                    }
-                    else
-                    {
-                        fadeStep= FADE_STEP_TIME;           // переход — в обычном темпе
-                    }
-                    fadeBlack+= switchDarkness * FADE_STEP;
-
-                    if (fadeBlack>= 255.0f)
-                    {
-                        // экран полностью чёрный — глаз не видит подмены
-                        fadeBlack= 255.0f;
-                        if (!gameOver)
-                        {
-                            // обычный переход: смена мира под чёрным
-                            // номер растёт ДО генерации: зелья нового уровня считаются по его номеру
-                            levelNumber++;
-                            StartNextLevel(dungeon, player, enemies, door, potions, levelNumber);
-                            levelText.setString("Level: " + std::to_string(levelNumber));
-                            switchDarkness = -1;
-                        }
-                        // при gameOver чёрный экран просто держится —
-                        // пробел проверяется отдельно, каждый кадр (ниже)
-                    }
-                    else if (fadeBlack<= 0.0f)
-                    {
-                        fadeBlack= 0.0f;
-                        switchDarkness = 0;
-                        freezeTime = false; // переход завершён
-                    }
-                }
-            }
-        }
-
-        // рестарт на экране смерти: проверяем ПРОБЕЛ каждый кадр
-        if (gameOver && fadeBlack >= 255.0f &&
-            sf::Keyboard::isKeyPressed(sf::Keyboard::Space))
-        {
-            player.hpPlayer = MAX_HP_PLAYER;
-            hpText.setString("HP: " + std::to_string(player.hpPlayer));
-            // сначала сброс номера, потом генерация: иначе первый уровень получит зелья уровня смерти
-            levelNumber = 1;
-            StartNextLevel(dungeon, player, enemies, door, potions, levelNumber);
-            levelText.setString("Level: 1");
-            gameOver = false;
-            switchDarkness = -1;                 // осветляемся на новом уровне
-            fadeStep = GAMEOVER_FADE_STEP_TIME;  // первая ступень осветления через 0.5 с, дальше обычный темп (gameOver уже false)
-        }
-
-        // у каждого врага свой таймер шага: шатун ходит реже ищейки
-        if (!freezeTime)
-        {
-            for (int i = 0; i < enemies.size(); i++)
-            {
-                enemies[i]->stepTimerEnemy -= deltaTime;
-                if (enemies[i]->stepTimerEnemy <= 0.0f)
-                {
-                    int xCellOld = enemies[i]->xCellEnemy;
-                    int yCellOld = enemies[i]->yCellEnemy;
-                    enemies[i]->FindPlayer(player, dungeon, door, enemies);
-
-                    // клетка занята другим врагом — шаг отменяется: враги не
-                    // накладываются друг на друга (и на игроке стоит только один)
-                    for (int j = 0; j < enemies.size(); j++)
-                    {
-                        if (j != i && enemies[i]->xCellEnemy == enemies[j]->xCellEnemy
-                            && enemies[i]->yCellEnemy == enemies[j]->yCellEnemy)
-                        {
-                            enemies[i]->SetPositionEnemy(xCellOld, yCellOld);
-                        }
-                    }
-                    // только теперь известно, состоялся ли шаг: сначала проверка, потом анимация
-                    enemies[i]->AnimateStepEnemy(xCellOld, yCellOld);
-                    enemies[i]->stepTimerEnemy = enemies[i]->stepTimeEnemy;
-                }
-            }
-        }
-
-        // проверяем, догнал ли игрока враг; на клетке игрока стоит максимум один
-        // (шаг на занятую клетку отменяется), бьёт он своим уроном
-        bool enemyCatchesPlayer = false;
-        int damageCatch = 0;
-        for (const std::unique_ptr<Enemy> &enemy : enemies)
-        {
-            if (enemy->xCellEnemy == player.xCellPlayer
-                && enemy->yCellEnemy == player.yCellPlayer)
-            {
-                enemyCatchesPlayer = true;
-                if (enemy->damageEnemy > damageCatch)
-                {
-                    damageCatch = enemy->damageEnemy;
-                }
-            }
-        }
-
-        // урон при поимке: враг стоит на клетке игрока — здоровье тратится
-        // через CONTACT_DAMAGE_INTERVAL секунд, пока контакт не прервётся
-        contactDamageTimer -= deltaTime; // тик таймера урона (каждый кадр)
-
-        if (enemyCatchesPlayer && !gameOver && contactDamageTimer <= 0.0f)
-        {
-            player.hpPlayer -= damageCatch;
-            // после зелья HP не кратно урону и может уйти в минус: на панели показываем 0
-            if (player.hpPlayer < 0)
-            {
-                player.hpPlayer = 0;
-            }
-            hpText.setString("HP: " + std::to_string(player.hpPlayer));
-            contactDamageTimer = CONTACT_DAMAGE_INTERVAL; // пауза до следующего удара
-
-            // красные искры из центра клетки удара
-            SpawnBurst(particles,
-                       static_cast<float>(player.xCellPlayer * TILE_SIZE) + TILE_SIZE / 2.0f,
-                       static_cast<float>(player.yCellPlayer * TILE_SIZE) + TILE_SIZE / 2.0f,
-                       sf::Color(220, 30, 30));
-
-            if (player.hpPlayer <= 0)
-            {
-                // смерть: замороженное медленное затемнение
-                gameOver = true;
-                freezeTime = true;
-                freezeTimeTimer = 0.0f;              // без 3-секундной паузы
-                switchDarkness = 1;                   // сразу темнеем
-                fadeStep = GAMEOVER_FADE_STEP_TIME;   // но медленно: шаг за 0.5 с
-
-                // счёт пройденных уровней: умерли на levelNumber —
-                // значит, завершили levelNumber − 1
-                gameOverStats.setString("Levels passed: " + std::to_string(levelNumber - 1));
-
-                // центрируем все три надписи по горизонтали (по ширине каждой)
-                gameOverTitle.setPosition((WINDOW_WIDTH - gameOverTitle.getGlobalBounds().width) / 2.0f, 200.f);
-                gameOverStats.setPosition((WINDOW_WIDTH - gameOverStats.getGlobalBounds().width) / 2.0f, 280.f);
-                gameOverText.setPosition((WINDOW_WIDTH - gameOverText.getGlobalBounds().width) / 2.0f, 330.f);
             }
         }
 
