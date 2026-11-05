@@ -2,6 +2,7 @@
 #include "Door.h"
 #include "Dungeon.h"
 #include "Enemy.h"
+#include "GameSounds.h"
 #include "GameTextures.h"
 #include "Particle.h"
 #include "Player.h"
@@ -34,16 +35,23 @@ void BuildMenuItems(sf::Text items[], const std::string names[], int count,
     }
 }
 
-// стрелки двигают выбор по кругу. + count, чтобы из 0 попасть на последний пункт, а не в минус
-void MoveMenuSelection(int &selected, int count, sf::Keyboard::Key key)
+// стрелки двигают выбор по кругу и щёлкают, Enter звучит подтверждением.
+// + count, чтобы из 0 попасть на последний пункт, а не в минус
+void MoveMenuSelection(int &selected, int count, sf::Keyboard::Key key, GameSounds &sounds)
 {
     if (key == sf::Keyboard::Up)
     {
         selected = (selected + count - 1) % count;
+        sounds.clickSound.play();
     }
     else if (key == sf::Keyboard::Down)
     {
         selected = (selected + 1) % count;
+        sounds.clickSound.play();
+    }
+    else if (key == sf::Keyboard::Enter)
+    {
+        sounds.selectSound.play();
     }
 }
 
@@ -327,6 +335,11 @@ int main()
     GameTextures textures;
     textures.LoadTextures();
 
+    // звуки: так же один раз до игрового цикла. Игра открывается в меню — сразу его музыка
+    GameSounds sounds;
+    sounds.LoadSounds();
+    sounds.menuMusic.play();
+
     // шрифт для игровой надписи и экрана смерти.
     sf::Font font;
     bool fontLoaded = font.loadFromFile("Fonts/Roboto-Black.ttf");
@@ -466,7 +479,7 @@ int main()
 
                 if (gameState == GameState::Menu && menuConfirmOpen)
                 {
-                    MoveMenuSelection(selectedConfirmItem, CONFIRM_ITEMS_COUNT, key);
+                    MoveMenuSelection(selectedConfirmItem, CONFIRM_ITEMS_COUNT, key, sounds);
                     if (key == sf::Keyboard::Escape)
                     {
                         menuConfirmOpen = false;
@@ -482,7 +495,7 @@ int main()
                 }
                 else if (gameState == GameState::Menu)
                 {
-                    MoveMenuSelection(selectedMenuItem, MENU_ITEMS_COUNT, key);
+                    MoveMenuSelection(selectedMenuItem, MENU_ITEMS_COUNT, key, sounds);
                     if (key == sf::Keyboard::Up || key == sf::Keyboard::Down)
                     {
                         menuHintVisible = false;
@@ -492,6 +505,8 @@ int main()
                         if (selectedMenuItem == 0)
                         {
                             gameState = GameState::Playing;
+                            sounds.menuMusic.stop();
+                            sounds.gameMusic.play();
                         }
                         else if (selectedMenuItem == MENU_ITEMS_COUNT - 1)
                         {
@@ -506,7 +521,7 @@ int main()
                 }
                 else if (gameState == GameState::Paused && pauseConfirmOpen)
                 {
-                    MoveMenuSelection(selectedConfirmItem, CONFIRM_ITEMS_COUNT, key);
+                    MoveMenuSelection(selectedConfirmItem, CONFIRM_ITEMS_COUNT, key, sounds);
                     if (key == sf::Keyboard::Escape)
                     {
                         pauseConfirmOpen = false; // передумал: обратно в меню паузы
@@ -529,16 +544,18 @@ int main()
                 }
                 else if (gameState == GameState::Paused)
                 {
-                    MoveMenuSelection(selectedPauseItem, PAUSE_ITEMS_COUNT, key);
+                    MoveMenuSelection(selectedPauseItem, PAUSE_ITEMS_COUNT, key, sounds);
                     if (key == sf::Keyboard::Escape)
                     {
                         gameState = GameState::Playing;
+                        sounds.gameMusic.play(); // после pause() продолжает с того же места
                     }
                     else if (key == sf::Keyboard::Enter)
                     {
                         if (selectedPauseItem == 0)
                         {
                             gameState = GameState::Playing;
+                            sounds.gameMusic.play();
                         }
                         else
                         {
@@ -552,7 +569,7 @@ int main()
                     // пункты работают, только когда экран смерти уже показан
                     if (fadeBlack >= 255.0f)
                     {
-                        MoveMenuSelection(selectedGameOverItem, GAMEOVER_ITEMS_COUNT, key);
+                        MoveMenuSelection(selectedGameOverItem, GAMEOVER_ITEMS_COUNT, key, sounds);
                         if (key == sf::Keyboard::Enter)
                         {
                             if (selectedGameOverItem == 0)
@@ -570,6 +587,7 @@ int main()
                 {
                     gameState = GameState::Paused;
                     selectedPauseItem = 0;
+                    sounds.gameMusic.pause();
                 }
             }
         }
@@ -595,14 +613,17 @@ int main()
             moveCooldown = 0.0f;
             contactDamageTimer = 0.0f;
             selectedGameOverItem = 0;
+            sounds.gameMusic.stop(); // stop, а не pause: следующий play() начнёт трек сначала
 
             if (startNewGame)
             {
                 gameState = GameState::Playing;
+                sounds.gameMusic.play();
             }
             else
             {
                 gameState = GameState::Menu;
+                sounds.menuMusic.play();
                 selectedMenuItem = 0;
                 menuHintVisible = false;
             }
@@ -657,6 +678,7 @@ int main()
                         healAmount = MAX_HP_PLAYER - player.hpPlayer; // лечим только до полного
                     }
                     player.hpPlayer += healAmount;
+                    sounds.potionSound.play();
                     hpText.setString("HP: " + std::to_string(player.hpPlayer));
 
                     // зелёная вспышка в момент выпитого зелья
@@ -674,7 +696,8 @@ int main()
             if (!freezeTime && player.xCellPlayer == door.xCellDoor && player.yCellPlayer == door.yCellDoor)
             {
                 freezeTime = true;
-                freezeTimeTimer = 3.0f;
+                freezeTimeTimer = 1.0f;
+                sounds.doorSound.play(); // звучит в паузе перед затемнением
             }
 
             // жизнь частиц: двигаем всех, затем мёртвых убираем из вектора
@@ -812,8 +835,10 @@ int main()
                 {
                     // смерть: замороженное медленное затемнение
                     gameOver = true;
+                    sounds.gameMusic.stop();
+                    sounds.gameOverSound.play();
                     freezeTime = true;
-                    freezeTimeTimer = 0.0f;              // без 3-секундной паузы
+                    freezeTimeTimer = 0.0f;              // без паузы перед затемнением
                     switchDarkness = 1;                   // сразу темнеем
                     fadeStep = GAMEOVER_FADE_STEP_TIME;   // но медленно: шаг за 0.5 с
 
@@ -824,6 +849,10 @@ int main()
                     // центрируем надписи по горизонтали (по ширине каждой)
                     gameOverTitle.setPosition((WINDOW_WIDTH - gameOverTitle.getGlobalBounds().width) / 2.0f, 180.f);
                     gameOverStats.setPosition((WINDOW_WIDTH - gameOverStats.getGlobalBounds().width) / 2.0f, 265.f);
+                }
+                else
+                {
+                    sounds.damageSound.play(); // смертельный удар озвучивает gameOverSound
                 }
             }
         }
