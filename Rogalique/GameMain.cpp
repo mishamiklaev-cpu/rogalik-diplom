@@ -21,6 +21,49 @@ enum class GameState
     Paused
 };
 
+// собирает пункты меню: текст и место по центру окна, столбиком сверху вниз
+void BuildMenuItems(sf::Text items[], const std::string names[], int count,
+                    const sf::Font &font, float yFirst)
+{
+    for (int i = 0; i < count; i++)
+    {
+        items[i].setFont(font);
+        items[i].setString(names[i]);
+        items[i].setCharacterSize(30);
+        items[i].setPosition((WINDOW_WIDTH - items[i].getGlobalBounds().width) / 2.0f, yFirst + i * 42.f);
+    }
+}
+
+// стрелки двигают выбор по кругу. + count, чтобы из 0 попасть на последний пункт, а не в минус
+void MoveMenuSelection(int &selected, int count, sf::Keyboard::Key key)
+{
+    if (key == sf::Keyboard::Up)
+    {
+        selected = (selected + count - 1) % count;
+    }
+    else if (key == sf::Keyboard::Down)
+    {
+        selected = (selected + 1) % count;
+    }
+}
+
+// рисует пункты: выбранный золотой, остальные белые
+void DrawMenuItems(sf::RenderWindow &window, sf::Text items[], int count, int selected)
+{
+    for (int i = 0; i < count; i++)
+    {
+        if (i == selected)
+        {
+            items[i].setFillColor(sf::Color(240, 180, 40));
+        }
+        else
+        {
+            items[i].setFillColor(sf::Color::White);
+        }
+        window.draw(items[i]);
+    }
+}
+
 // вспышка частиц из точки события:
 // разлёт в случайные стороны, позиции слегка разбросаны вокруг точки
 void SpawnBurst(std::vector<Particle> &particles, float xPoint, float yPoint,
@@ -302,12 +345,13 @@ int main()
     levelText.setFillColor(sf::Color::White);
     levelText.setPosition(130.f, 13.f);
 
-    // надпись экрана смерти, центрируется после создания (знаем ширину текста)
-    sf::Text gameOverText("Press Space to Restart", font, 32);
-    gameOverText.setFillColor(sf::Color::White);
+    // подсказка справа на панели: прижимаем к краю окна по ширине текста
+    sf::Text hintText("Move: Arrows   Pause: Esc", font, 18);
+    hintText.setFillColor(sf::Color::White);
+    hintText.setPosition(WINDOW_WIDTH - hintText.getGlobalBounds().width - 12.f, 15.f);
 
     // надписи экрана смерти. По вертикали — фиксированные места
-    // (заголовок / счёт / подсказка); по горизонтали центрируются в момент
+    // (заголовок / счёт); по горизонтали центрируются в момент
     // смерти, когда известны ширины всех текстов
     sf::Text gameOverTitle("Game Over", font, 60);
     gameOverTitle.setFillColor(sf::Color::Red);
@@ -323,7 +367,38 @@ int main()
     panelShape.setFillColor(sf::Color(30, 30, 30));
 
     // что сейчас происходит в игре
-    GameState gameState = GameState::Playing;
+    GameState gameState = GameState::Menu;
+
+    // главное меню: картинка с заголовком на всё окно, пункты лежат на полу, на тёмной плашке
+    sf::RectangleShape menuPicture(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT));
+    if (textures.menuLoaded)
+    {
+        menuPicture.setTexture(&textures.menuTexture);
+    }
+
+    const float MENU_ITEMS_Y = 425.f; // верх первого пункта: начало пола на картинке
+
+    sf::RectangleShape menuPanel(sf::Vector2f(200.f, 175.f));
+    menuPanel.setPosition((WINDOW_WIDTH - 200.f) / 2.0f, MENU_ITEMS_Y - 5.f);
+    menuPanel.setFillColor(sf::Color(0, 0, 0, 150));
+
+    // заголовок нужен, только если картинки нет: на самой картинке он уже есть
+    sf::Text menuTitle("Dungeon Escape", font, 40);
+    menuTitle.setFillColor(sf::Color::White);
+    menuTitle.setPosition((WINDOW_WIDTH - menuTitle.getGlobalBounds().width) / 2.0f, MENU_ITEMS_Y - 60.f);
+
+    const int MENU_ITEMS_COUNT = 4;
+    const std::string menuNames[MENU_ITEMS_COUNT] = { "Start", "Records", "Options", "Exit" };
+    sf::Text menuItems[MENU_ITEMS_COUNT];
+    BuildMenuItems(menuItems, menuNames, MENU_ITEMS_COUNT, font, MENU_ITEMS_Y);
+    int selectedMenuItem = 0; // номер выбранного пункта: просто число, не адрес в памяти
+
+    // заглушка: Records и Options пока не работают, Enter показывает эту надпись
+    sf::Text menuHint("Coming soon", font, 22);
+    menuHint.setFillColor(sf::Color::White);
+    // справа от плашки: снизу под пунктами места нет
+    menuHint.setPosition(WINDOW_WIDTH / 2.0f + 110.f, MENU_ITEMS_Y + 45.f);
+    bool menuHintVisible = false;
 
     // экран паузы: полупрозрачная пелена, поверх неё надписи по центру окна
     sf::RectangleShape pauseShape(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT));
@@ -331,11 +406,40 @@ int main()
 
     sf::Text pauseTitle("Pause", font, 60);
     pauseTitle.setFillColor(sf::Color::White);
-    pauseTitle.setPosition((WINDOW_WIDTH - pauseTitle.getGlobalBounds().width) / 2.0f, 220.f);
+    pauseTitle.setPosition((WINDOW_WIDTH - pauseTitle.getGlobalBounds().width) / 2.0f, 170.f);
 
-    sf::Text pauseText("Press Esc to Continue", font, 28);
-    pauseText.setFillColor(sf::Color::White);
-    pauseText.setPosition((WINDOW_WIDTH - pauseText.getGlobalBounds().width) / 2.0f, 300.f);
+    const int PAUSE_ITEMS_COUNT = 3;
+    const std::string pauseNames[PAUSE_ITEMS_COUNT] = { "Continue", "New Game", "Main Menu" };
+    sf::Text pauseItems[PAUSE_ITEMS_COUNT];
+    BuildMenuItems(pauseItems, pauseNames, PAUSE_ITEMS_COUNT, font, 260.f);
+    int selectedPauseItem = 0;
+
+    // подтверждение на паузе: текущий забег будет потерян
+    sf::Text confirmTitle("Are you sure?", font, 44);
+    confirmTitle.setFillColor(sf::Color::White);
+    confirmTitle.setPosition((WINDOW_WIDTH - confirmTitle.getGlobalBounds().width) / 2.0f, 180.f);
+
+    const int CONFIRM_ITEMS_COUNT = 2;
+    const std::string confirmNames[CONFIRM_ITEMS_COUNT] = { "Yes", "No" };
+    sf::Text confirmItems[CONFIRM_ITEMS_COUNT];
+    BuildMenuItems(confirmItems, confirmNames, CONFIRM_ITEMS_COUNT, font, 260.f);
+    int selectedConfirmItem = 1;
+    bool pauseConfirmOpen = false;
+
+    // подтверждение выхода в главном меню: на той же плашке, вместо пунктов
+    sf::Text menuConfirmTitle("Are you sure?", font, 24);
+    menuConfirmTitle.setFillColor(sf::Color::White);
+    menuConfirmTitle.setPosition((WINDOW_WIDTH - menuConfirmTitle.getGlobalBounds().width) / 2.0f, MENU_ITEMS_Y + 5.f);
+    sf::Text menuConfirmItems[CONFIRM_ITEMS_COUNT];
+    BuildMenuItems(menuConfirmItems, confirmNames, CONFIRM_ITEMS_COUNT, font, MENU_ITEMS_Y + 50.f);
+    bool menuConfirmOpen = false;
+
+    // мини-меню экрана смерти: забег уже окончен, поэтому без подтверждения
+    const int GAMEOVER_ITEMS_COUNT = 2;
+    const std::string gameOverNames[GAMEOVER_ITEMS_COUNT] = { "New Game", "Main Menu" };
+    sf::Text gameOverItems[GAMEOVER_ITEMS_COUNT];
+    BuildMenuItems(gameOverItems, gameOverNames, GAMEOVER_ITEMS_COUNT, font, 330.f);
+    int selectedGameOverItem = 0;
 
     // смерть и рестарт
     bool gameOver = false;
@@ -343,6 +447,10 @@ int main()
 
     while (window.isOpen())
     {
+        // выбор пункта только ставит флаг, сам сброс мира один — после цикла событий
+        bool startNewGame = false;
+        bool goToMenu = false;
+
         while (window.pollEvent(event))
         {
             if (event.type == sf::Event::Closed)
@@ -350,18 +458,153 @@ int main()
                 window.close();
             }
 
-            // Esc — событие, а не isKeyPressed: иначе пауза мигала бы каждый кадр, пока клавиша нажата.
-            // На экране смерти пауза не нужна: мир и так стоит
-            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Escape && !gameOver)
+            // клавиши меню и паузы — события, а не isKeyPressed: одно нажатие — одно действие.
+            // Цепочка else if: нажатие обрабатывает только один экран
+            if (event.type == sf::Event::KeyPressed)
             {
-                if (gameState == GameState::Playing)
+                sf::Keyboard::Key key = event.key.code;
+
+                if (gameState == GameState::Menu && menuConfirmOpen)
                 {
-                    gameState = GameState::Paused;
+                    MoveMenuSelection(selectedConfirmItem, CONFIRM_ITEMS_COUNT, key);
+                    if (key == sf::Keyboard::Escape)
+                    {
+                        menuConfirmOpen = false;
+                    }
+                    else if (key == sf::Keyboard::Enter)
+                    {
+                        menuConfirmOpen = false;
+                        if (selectedConfirmItem == 0) // Yes
+                        {
+                            window.close();
+                        }
+                    }
+                }
+                else if (gameState == GameState::Menu)
+                {
+                    MoveMenuSelection(selectedMenuItem, MENU_ITEMS_COUNT, key);
+                    if (key == sf::Keyboard::Up || key == sf::Keyboard::Down)
+                    {
+                        menuHintVisible = false;
+                    }
+                    else if (key == sf::Keyboard::Enter)
+                    {
+                        if (selectedMenuItem == 0)
+                        {
+                            gameState = GameState::Playing;
+                        }
+                        else if (selectedMenuItem == MENU_ITEMS_COUNT - 1)
+                        {
+                            menuConfirmOpen = true;
+                            selectedConfirmItem = 1; // по умолчанию No, как и на паузе
+                        }
+                        else
+                        {
+                            menuHintVisible = true; // Records и Options: пока заглушки
+                        }
+                    }
+                }
+                else if (gameState == GameState::Paused && pauseConfirmOpen)
+                {
+                    MoveMenuSelection(selectedConfirmItem, CONFIRM_ITEMS_COUNT, key);
+                    if (key == sf::Keyboard::Escape)
+                    {
+                        pauseConfirmOpen = false; // передумал: обратно в меню паузы
+                    }
+                    else if (key == sf::Keyboard::Enter)
+                    {
+                        pauseConfirmOpen = false;
+                        if (selectedConfirmItem == 0) // Yes
+                        {
+                            if (selectedPauseItem == 1)
+                            {
+                                startNewGame = true;
+                            }
+                            else
+                            {
+                                goToMenu = true;
+                            }
+                        }
+                    }
                 }
                 else if (gameState == GameState::Paused)
                 {
-                    gameState = GameState::Playing;
+                    MoveMenuSelection(selectedPauseItem, PAUSE_ITEMS_COUNT, key);
+                    if (key == sf::Keyboard::Escape)
+                    {
+                        gameState = GameState::Playing;
+                    }
+                    else if (key == sf::Keyboard::Enter)
+                    {
+                        if (selectedPauseItem == 0)
+                        {
+                            gameState = GameState::Playing;
+                        }
+                        else
+                        {
+                            pauseConfirmOpen = true;
+                            selectedConfirmItem = 1; // по умолчанию No: случайный Enter не сотрёт забег
+                        }
+                    }
                 }
+                else if (gameOver)
+                {
+                    // пункты работают, только когда экран смерти уже показан
+                    if (fadeBlack >= 255.0f)
+                    {
+                        MoveMenuSelection(selectedGameOverItem, GAMEOVER_ITEMS_COUNT, key);
+                        if (key == sf::Keyboard::Enter)
+                        {
+                            if (selectedGameOverItem == 0)
+                            {
+                                startNewGame = true;
+                            }
+                            else
+                            {
+                                goToMenu = true;
+                            }
+                        }
+                    }
+                }
+                else if (key == sf::Keyboard::Escape)
+                {
+                    gameState = GameState::Paused;
+                    selectedPauseItem = 0;
+                }
+            }
+        }
+
+        // новая игра или выход в меню: мир собирается заново и все таймеры сбрасываются
+        if (startNewGame || goToMenu)
+        {
+            player.hpPlayer = MAX_HP_PLAYER;
+            player.directionPlayer = Direction::Down;
+            player.framePlayer = 0;
+            hpText.setString("HP: " + std::to_string(player.hpPlayer));
+            // сначала сброс номера, потом генерация: иначе первый уровень получит зелья прошлого забега
+            levelNumber = 1;
+            StartNextLevel(dungeon, player, enemies, door, potions, levelNumber);
+            levelText.setString("Level: 1");
+            particles.clear();
+            gameOver = false;
+            freezeTime = false;
+            freezeTimeTimer = 0.0f;
+            fadeBlack = 0.0f;
+            switchDarkness = 0;
+            fadeStep = 0.0f;
+            moveCooldown = 0.0f;
+            contactDamageTimer = 0.0f;
+            selectedGameOverItem = 0;
+
+            if (startNewGame)
+            {
+                gameState = GameState::Playing;
+            }
+            else
+            {
+                gameState = GameState::Menu;
+                selectedMenuItem = 0;
+                menuHintVisible = false;
             }
         }
 
@@ -379,22 +622,22 @@ int main()
 
             if (!freezeTime && moveCooldown <= 0.0f)
             {
-                if (sf::Keyboard::isKeyPressed(sf::Keyboard::W))
+                if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
                 {
                     player.MovePlayer(0, -1, dungeon);
                     moveCooldown = 0.1f;
                 }
-                else if (sf::Keyboard::isKeyPressed(sf::Keyboard::S))
+                else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down))
                 {
                     player.MovePlayer(0, 1, dungeon);
                     moveCooldown = 0.1f;
                 }
-                else if (sf::Keyboard::isKeyPressed(sf::Keyboard::A))
+                else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left))
                 {
                     player.MovePlayer(-1, 0, dungeon);
                     moveCooldown = 0.1f;
                 }
-                else if (sf::Keyboard::isKeyPressed(sf::Keyboard::D))
+                else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
                 {
                     player.MovePlayer(1, 0, dungeon);
                     moveCooldown = 0.1f;
@@ -487,7 +730,7 @@ int main()
                                 switchDarkness = -1;
                             }
                             // при gameOver чёрный экран просто держится —
-                            // пробел проверяется отдельно, каждый кадр (ниже)
+                            // на нём работает мини-меню смерти
                         }
                         else if (fadeBlack<= 0.0f)
                         {
@@ -497,21 +740,6 @@ int main()
                         }
                     }
                 }
-            }
-
-            // рестарт на экране смерти: проверяем ПРОБЕЛ каждый кадр
-            if (gameOver && fadeBlack >= 255.0f &&
-                sf::Keyboard::isKeyPressed(sf::Keyboard::Space))
-            {
-                player.hpPlayer = MAX_HP_PLAYER;
-                hpText.setString("HP: " + std::to_string(player.hpPlayer));
-                // сначала сброс номера, потом генерация: иначе первый уровень получит зелья уровня смерти
-                levelNumber = 1;
-                StartNextLevel(dungeon, player, enemies, door, potions, levelNumber);
-                levelText.setString("Level: 1");
-                gameOver = false;
-                switchDarkness = -1;                 // осветляемся на новом уровне
-                fadeStep = GAMEOVER_FADE_STEP_TIME;  // первая ступень осветления через 0.5 с, дальше обычный темп (gameOver уже false)
             }
 
             // у каждого врага свой таймер шага: шатун ходит реже ищейки
@@ -593,12 +821,42 @@ int main()
                     // значит, завершили levelNumber − 1
                     gameOverStats.setString("Levels passed: " + std::to_string(levelNumber - 1));
 
-                    // центрируем все три надписи по горизонтали (по ширине каждой)
-                    gameOverTitle.setPosition((WINDOW_WIDTH - gameOverTitle.getGlobalBounds().width) / 2.0f, 200.f);
-                    gameOverStats.setPosition((WINDOW_WIDTH - gameOverStats.getGlobalBounds().width) / 2.0f, 280.f);
-                    gameOverText.setPosition((WINDOW_WIDTH - gameOverText.getGlobalBounds().width) / 2.0f, 330.f);
+                    // центрируем надписи по горизонтали (по ширине каждой)
+                    gameOverTitle.setPosition((WINDOW_WIDTH - gameOverTitle.getGlobalBounds().width) / 2.0f, 180.f);
+                    gameOverStats.setPosition((WINDOW_WIDTH - gameOverStats.getGlobalBounds().width) / 2.0f, 265.f);
                 }
             }
+        }
+
+        // в меню мир не рисуем: кадр собран, остальной цикл пропускаем
+        if (gameState == GameState::Menu)
+        {
+            window.clear();
+            window.setView(window.getDefaultView());
+            if (textures.menuLoaded)
+            {
+                window.draw(menuPicture);
+            }
+            else if (fontLoaded)
+            {
+                window.draw(menuTitle);
+            }
+            window.draw(menuPanel);
+            if (fontLoaded && menuConfirmOpen)
+            {
+                window.draw(menuConfirmTitle);
+                DrawMenuItems(window, menuConfirmItems, CONFIRM_ITEMS_COUNT, selectedConfirmItem);
+            }
+            else if (fontLoaded)
+            {
+                DrawMenuItems(window, menuItems, MENU_ITEMS_COUNT, selectedMenuItem);
+                if (menuHintVisible)
+                {
+                    window.draw(menuHint);
+                }
+            }
+            window.display();
+            continue;
         }
 
         // позиция камеры: центр клетки игрока
@@ -673,6 +931,7 @@ int main()
         {
             window.draw(hpText);
             window.draw(levelText);
+            window.draw(hintText);
         }
 
         fadeShape.setFillColor(sf::Color(0, 0, 0, static_cast<sf::Uint8>(fadeBlack)));
@@ -684,16 +943,21 @@ int main()
         {
             window.draw(gameOverTitle);
             window.draw(gameOverStats);
-            window.draw(gameOverText);
+            DrawMenuItems(window, gameOverItems, GAMEOVER_ITEMS_COUNT, selectedGameOverItem);
         }
 
         if (gameState == GameState::Paused)
         {
             window.draw(pauseShape);
-            if (fontLoaded)
+            if (fontLoaded && pauseConfirmOpen)
+            {
+                window.draw(confirmTitle);
+                DrawMenuItems(window, confirmItems, CONFIRM_ITEMS_COUNT, selectedConfirmItem);
+            }
+            else if (fontLoaded)
             {
                 window.draw(pauseTitle);
-                window.draw(pauseText);
+                DrawMenuItems(window, pauseItems, PAUSE_ITEMS_COUNT, selectedPauseItem);
             }
         }
 
