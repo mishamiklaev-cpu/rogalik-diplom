@@ -20,4 +20,5 @@ void GameTextures::LoadTextures()
     playerLoaded = LoadTextureFile(playerTexture, "player.png");
     shatunLoaded = LoadTextureFile(shatunTexture, "shatun.png");
     houndLoaded = LoadTextureFile(houndTexture, "hound.png");
+    menuLoaded = LoadTextureFile(menuTexture, "menu.png");
 }

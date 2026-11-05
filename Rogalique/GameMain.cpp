@@ -13,6 +13,57 @@
 #include <string>
 #include <vector>
 
+// одно поле вместо набора bool: два состояния сразу быть не может
+enum class GameState
+{
+    Menu,
+    Playing,
+    Paused
+};
+
+// собирает пункты меню: текст и место по центру окна, столбиком сверху вниз
+void BuildMenuItems(sf::Text items[], const std::string names[], int count,
+                    const sf::Font &font, float yFirst)
+{
+    for (int i = 0; i < count; i++)
+    {
+        items[i].setFont(font);
+        items[i].setString(names[i]);
+        items[i].setCharacterSize(30);
+        items[i].setPosition((WINDOW_WIDTH - items[i].getGlobalBounds().width) / 2.0f, yFirst + i * 42.f);
+    }
+}
+
+// стрелки двигают выбор по кругу. + count, чтобы из 0 попасть на последний пункт, а не в минус
+void MoveMenuSelection(int &selected, int count, sf::Keyboard::Key key)
+{
+    if (key == sf::Keyboard::Up)
+    {
+        selected = (selected + count - 1) % count;
+    }
+    else if (key == sf::Keyboard::Down)
+    {
+        selected = (selected + 1) % count;
+    }
+}
+
+// рисует пункты: выбранный золотой, остальные белые
+void DrawMenuItems(sf::RenderWindow &window, sf::Text items[], int count, int selected)
+{
+    for (int i = 0; i < count; i++)
+    {
+        if (i == selected)
+        {
+            items[i].setFillColor(sf::Color(240, 180, 40));
+        }
+        else
+        {
+            items[i].setFillColor(sf::Color::White);
+        }
+        window.draw(items[i]);
+    }
+}
+
 // вспышка частиц из точки события:
 // разлёт в случайные стороны, позиции слегка разбросаны вокруг точки
 void SpawnBurst(std::vector<Particle> &particles, float xPoint, float yPoint,
@@ -214,6 +265,8 @@ int main()
 
     // генератор окна
     sf::RenderWindow window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Dungeon Escape");
+    // удержание клавиши не присылает повторов: одно нажатие — одно событие KeyPressed
+    window.setKeyRepeatEnabled(false);
 
     // создаем объект Dungeon: уровень собирается одним методом класса
     Dungeon dungeon;
@@ -292,12 +345,13 @@ int main()
     levelText.setFillColor(sf::Color::White);
     levelText.setPosition(130.f, 13.f);
 
-    // надпись экрана смерти, центрируется после создания (знаем ширину текста)
-    sf::Text gameOverText("Press Space to Restart", font, 32);
-    gameOverText.setFillColor(sf::Color::White);
+    // подсказка справа на панели: прижимаем к краю окна по ширине текста
+    sf::Text hintText("Move: Arrows   Pause: Esc", font, 18);
+    hintText.setFillColor(sf::Color::White);
+    hintText.setPosition(WINDOW_WIDTH - hintText.getGlobalBounds().width - 12.f, 15.f);
 
     // надписи экрана смерти. По вертикали — фиксированные места
-    // (заголовок / счёт / подсказка); по горизонтали центрируются в момент
+    // (заголовок / счёт); по горизонтали центрируются в момент
     // смерти, когда известны ширины всех текстов
     sf::Text gameOverTitle("Game Over", font, 60);
     gameOverTitle.setFillColor(sf::Color::Red);
@@ -312,245 +366,497 @@ int main()
     panelShape.setPosition(0.f, 0.f);
     panelShape.setFillColor(sf::Color(30, 30, 30));
 
+    // что сейчас происходит в игре
+    GameState gameState = GameState::Menu;
+
+    // главное меню: картинка с заголовком на всё окно, пункты лежат на полу, на тёмной плашке
+    sf::RectangleShape menuPicture(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT));
+    if (textures.menuLoaded)
+    {
+        menuPicture.setTexture(&textures.menuTexture);
+    }
+
+    const float MENU_ITEMS_Y = 425.f; // верх первого пункта: начало пола на картинке
+
+    sf::RectangleShape menuPanel(sf::Vector2f(200.f, 175.f));
+    menuPanel.setPosition((WINDOW_WIDTH - 200.f) / 2.0f, MENU_ITEMS_Y - 5.f);
+    menuPanel.setFillColor(sf::Color(0, 0, 0, 150));
+
+    // заголовок нужен, только если картинки нет: на самой картинке он уже есть
+    sf::Text menuTitle("Dungeon Escape", font, 40);
+    menuTitle.setFillColor(sf::Color::White);
+    menuTitle.setPosition((WINDOW_WIDTH - menuTitle.getGlobalBounds().width) / 2.0f, MENU_ITEMS_Y - 60.f);
+
+    const int MENU_ITEMS_COUNT = 4;
+    const std::string menuNames[MENU_ITEMS_COUNT] = { "Start", "Records", "Options", "Exit" };
+    sf::Text menuItems[MENU_ITEMS_COUNT];
+    BuildMenuItems(menuItems, menuNames, MENU_ITEMS_COUNT, font, MENU_ITEMS_Y);
+    int selectedMenuItem = 0; // номер выбранного пункта: просто число, не адрес в памяти
+
+    // заглушка: Records и Options пока не работают, Enter показывает эту надпись
+    sf::Text menuHint("Coming soon", font, 22);
+    menuHint.setFillColor(sf::Color::White);
+    // справа от плашки: снизу под пунктами места нет
+    menuHint.setPosition(WINDOW_WIDTH / 2.0f + 110.f, MENU_ITEMS_Y + 45.f);
+    bool menuHintVisible = false;
+
+    // экран паузы: полупрозрачная пелена, поверх неё надписи по центру окна
+    sf::RectangleShape pauseShape(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT));
+    pauseShape.setFillColor(sf::Color(0, 0, 0, 150));
+
+    sf::Text pauseTitle("Pause", font, 60);
+    pauseTitle.setFillColor(sf::Color::White);
+    pauseTitle.setPosition((WINDOW_WIDTH - pauseTitle.getGlobalBounds().width) / 2.0f, 170.f);
+
+    const int PAUSE_ITEMS_COUNT = 3;
+    const std::string pauseNames[PAUSE_ITEMS_COUNT] = { "Continue", "New Game", "Main Menu" };
+    sf::Text pauseItems[PAUSE_ITEMS_COUNT];
+    BuildMenuItems(pauseItems, pauseNames, PAUSE_ITEMS_COUNT, font, 260.f);
+    int selectedPauseItem = 0;
+
+    // подтверждение на паузе: текущий забег будет потерян
+    sf::Text confirmTitle("Are you sure?", font, 44);
+    confirmTitle.setFillColor(sf::Color::White);
+    confirmTitle.setPosition((WINDOW_WIDTH - confirmTitle.getGlobalBounds().width) / 2.0f, 180.f);
+
+    const int CONFIRM_ITEMS_COUNT = 2;
+    const std::string confirmNames[CONFIRM_ITEMS_COUNT] = { "Yes", "No" };
+    sf::Text confirmItems[CONFIRM_ITEMS_COUNT];
+    BuildMenuItems(confirmItems, confirmNames, CONFIRM_ITEMS_COUNT, font, 260.f);
+    int selectedConfirmItem = 1;
+    bool pauseConfirmOpen = false;
+
+    // подтверждение выхода в главном меню: на той же плашке, вместо пунктов
+    sf::Text menuConfirmTitle("Are you sure?", font, 24);
+    menuConfirmTitle.setFillColor(sf::Color::White);
+    menuConfirmTitle.setPosition((WINDOW_WIDTH - menuConfirmTitle.getGlobalBounds().width) / 2.0f, MENU_ITEMS_Y + 5.f);
+    sf::Text menuConfirmItems[CONFIRM_ITEMS_COUNT];
+    BuildMenuItems(menuConfirmItems, confirmNames, CONFIRM_ITEMS_COUNT, font, MENU_ITEMS_Y + 50.f);
+    bool menuConfirmOpen = false;
+
+    // мини-меню экрана смерти: забег уже окончен, поэтому без подтверждения
+    const int GAMEOVER_ITEMS_COUNT = 2;
+    const std::string gameOverNames[GAMEOVER_ITEMS_COUNT] = { "New Game", "Main Menu" };
+    sf::Text gameOverItems[GAMEOVER_ITEMS_COUNT];
+    BuildMenuItems(gameOverItems, gameOverNames, GAMEOVER_ITEMS_COUNT, font, 330.f);
+    int selectedGameOverItem = 0;
+
     // смерть и рестарт
     bool gameOver = false;
     float contactDamageTimer = 0.0f;   // пауза между ударами, пока враг стоит на игроке
 
     while (window.isOpen())
     {
+        // выбор пункта только ставит флаг, сам сброс мира один — после цикла событий
+        bool startNewGame = false;
+        bool goToMenu = false;
+
         while (window.pollEvent(event))
         {
             if (event.type == sf::Event::Closed)
             {
                 window.close();
             }
-        }
 
-        float deltaTime = clock.restart().asSeconds();
-        moveCooldown -= deltaTime;
+            // клавиши меню и паузы — события, а не isKeyPressed: одно нажатие — одно действие.
+            // Цепочка else if: нажатие обрабатывает только один экран
+            if (event.type == sf::Event::KeyPressed)
+            {
+                sf::Keyboard::Key key = event.key.code;
 
-        if (!freezeTime && moveCooldown <= 0.0f)
-        {
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::W))
-            {
-                player.MovePlayer(0, -1, dungeon);
-                moveCooldown = 0.1f;
-            }
-            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::S))
-            {
-                player.MovePlayer(0, 1, dungeon);
-                moveCooldown = 0.1f;
-            }
-            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::A))
-            {
-                player.MovePlayer(-1, 0, dungeon);
-                moveCooldown = 0.1f;
-            }
-            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::D))
-            {
-                player.MovePlayer(1, 0, dungeon);
-                moveCooldown = 0.1f;
-            }
-        }
-
-        // подбор зелья: игрок встал на клетку зелья — здоровье растёт,
-        // но не выше MAX_HP_PLAYER; зелье извлекается из вектора
-        for (int i = 0; i < potions.size(); i++)
-        {
-            if (player.xCellPlayer == potions[i].xPotion
-                && player.yCellPlayer == potions[i].yPotion)
-            {
-                int healAmount = POTION_HEAL;
-                if (player.hpPlayer + POTION_HEAL > MAX_HP_PLAYER)
+                if (gameState == GameState::Menu && menuConfirmOpen)
                 {
-                    healAmount = MAX_HP_PLAYER - player.hpPlayer; // лечим только до полного
-                }
-                player.hpPlayer += healAmount;
-                hpText.setString("HP: " + std::to_string(player.hpPlayer));
-
-                // зелёная вспышка в момент выпитого зелья
-                SpawnBurst(particles,
-                           static_cast<float>(player.xCellPlayer * TILE_SIZE) + TILE_SIZE / 2.0f,
-                           static_cast<float>(player.yCellPlayer * TILE_SIZE) + TILE_SIZE / 2.0f,
-                           sf::Color(30, 220, 60));
-
-                potions.erase(potions.begin() + i);
-                i--; 
-            }
-        }
-
-        // игрок встал на выход — переход запускается один раз и дальше идёт по таймеру
-        if (!freezeTime && player.xCellPlayer == door.xCellDoor && player.yCellPlayer == door.yCellDoor)
-        {
-            freezeTime = true;
-            freezeTimeTimer = 3.0f;
-        }
-
-        // жизнь частиц: двигаем всех, затем мёртвых убираем из вектора
-        for (int i = 0; i < particles.size(); i++)
-        {
-            particles[i].UpdateParticle(deltaTime);
-            if (particles[i].lifeParticle <= 0.0f)
-            {
-                particles.erase(particles.begin() + i);
-                i--; // после erase не пропустить следующую частицу
-            }
-        }
-
-        if (freezeTime)
-        {
-            if (freezeTimeTimer > 0.0f)
-            {
-                // фаза 1: пауза под будущую музыку перехода, мир заморожен
-                freezeTimeTimer -= deltaTime;
-                if (freezeTimeTimer <= 0.0f)
-                {
-                    switchDarkness = 1; // пауза кончилась — начинаем затемнение
-                    fadeStep= FADE_STEP_TIME;
-                }
-            }
-            else
-            {
-                // фаза 2/3: ступени затемнения, смена мира под чёрным, осветление
-                fadeStep-= deltaTime;
-                if (fadeStep<= 0.0f)
-                {
-                    if (gameOver)
+                    MoveMenuSelection(selectedConfirmItem, CONFIRM_ITEMS_COUNT, key);
+                    if (key == sf::Keyboard::Escape)
                     {
-                        fadeStep= GAMEOVER_FADE_STEP_TIME; // смерть темнеет медленно
+                        menuConfirmOpen = false;
                     }
-                    else
+                    else if (key == sf::Keyboard::Enter)
                     {
-                        fadeStep= FADE_STEP_TIME;           // переход — в обычном темпе
-                    }
-                    fadeBlack+= switchDarkness * FADE_STEP;
-
-                    if (fadeBlack>= 255.0f)
-                    {
-                        // экран полностью чёрный — глаз не видит подмены
-                        fadeBlack= 255.0f;
-                        if (!gameOver)
+                        menuConfirmOpen = false;
+                        if (selectedConfirmItem == 0) // Yes
                         {
-                            // обычный переход: смена мира под чёрным
-                            // номер растёт ДО генерации: зелья нового уровня считаются по его номеру
-                            levelNumber++;
-                            StartNextLevel(dungeon, player, enemies, door, potions, levelNumber);
-                            levelText.setString("Level: " + std::to_string(levelNumber));
-                            switchDarkness = -1;
+                            window.close();
                         }
-                        // при gameOver чёрный экран просто держится —
-                        // пробел проверяется отдельно, каждый кадр (ниже)
                     }
-                    else if (fadeBlack<= 0.0f)
+                }
+                else if (gameState == GameState::Menu)
+                {
+                    MoveMenuSelection(selectedMenuItem, MENU_ITEMS_COUNT, key);
+                    if (key == sf::Keyboard::Up || key == sf::Keyboard::Down)
                     {
-                        fadeBlack= 0.0f;
-                        switchDarkness = 0;
-                        freezeTime = false; // переход завершён
+                        menuHintVisible = false;
                     }
+                    else if (key == sf::Keyboard::Enter)
+                    {
+                        if (selectedMenuItem == 0)
+                        {
+                            gameState = GameState::Playing;
+                        }
+                        else if (selectedMenuItem == MENU_ITEMS_COUNT - 1)
+                        {
+                            menuConfirmOpen = true;
+                            selectedConfirmItem = 1; // по умолчанию No, как и на паузе
+                        }
+                        else
+                        {
+                            menuHintVisible = true; // Records и Options: пока заглушки
+                        }
+                    }
+                }
+                else if (gameState == GameState::Paused && pauseConfirmOpen)
+                {
+                    MoveMenuSelection(selectedConfirmItem, CONFIRM_ITEMS_COUNT, key);
+                    if (key == sf::Keyboard::Escape)
+                    {
+                        pauseConfirmOpen = false; // передумал: обратно в меню паузы
+                    }
+                    else if (key == sf::Keyboard::Enter)
+                    {
+                        pauseConfirmOpen = false;
+                        if (selectedConfirmItem == 0) // Yes
+                        {
+                            if (selectedPauseItem == 1)
+                            {
+                                startNewGame = true;
+                            }
+                            else
+                            {
+                                goToMenu = true;
+                            }
+                        }
+                    }
+                }
+                else if (gameState == GameState::Paused)
+                {
+                    MoveMenuSelection(selectedPauseItem, PAUSE_ITEMS_COUNT, key);
+                    if (key == sf::Keyboard::Escape)
+                    {
+                        gameState = GameState::Playing;
+                    }
+                    else if (key == sf::Keyboard::Enter)
+                    {
+                        if (selectedPauseItem == 0)
+                        {
+                            gameState = GameState::Playing;
+                        }
+                        else
+                        {
+                            pauseConfirmOpen = true;
+                            selectedConfirmItem = 1; // по умолчанию No: случайный Enter не сотрёт забег
+                        }
+                    }
+                }
+                else if (gameOver)
+                {
+                    // пункты работают, только когда экран смерти уже показан
+                    if (fadeBlack >= 255.0f)
+                    {
+                        MoveMenuSelection(selectedGameOverItem, GAMEOVER_ITEMS_COUNT, key);
+                        if (key == sf::Keyboard::Enter)
+                        {
+                            if (selectedGameOverItem == 0)
+                            {
+                                startNewGame = true;
+                            }
+                            else
+                            {
+                                goToMenu = true;
+                            }
+                        }
+                    }
+                }
+                else if (key == sf::Keyboard::Escape)
+                {
+                    gameState = GameState::Paused;
+                    selectedPauseItem = 0;
                 }
             }
         }
 
-        // рестарт на экране смерти: проверяем ПРОБЕЛ каждый кадр
-        if (gameOver && fadeBlack >= 255.0f &&
-            sf::Keyboard::isKeyPressed(sf::Keyboard::Space))
+        // новая игра или выход в меню: мир собирается заново и все таймеры сбрасываются
+        if (startNewGame || goToMenu)
         {
             player.hpPlayer = MAX_HP_PLAYER;
+            player.directionPlayer = Direction::Down;
+            player.framePlayer = 0;
             hpText.setString("HP: " + std::to_string(player.hpPlayer));
-            // сначала сброс номера, потом генерация: иначе первый уровень получит зелья уровня смерти
+            // сначала сброс номера, потом генерация: иначе первый уровень получит зелья прошлого забега
             levelNumber = 1;
             StartNextLevel(dungeon, player, enemies, door, potions, levelNumber);
             levelText.setString("Level: 1");
+            particles.clear();
             gameOver = false;
-            switchDarkness = -1;                 // осветляемся на новом уровне
-            fadeStep = GAMEOVER_FADE_STEP_TIME;  // первая ступень осветления через 0.5 с, дальше обычный темп (gameOver уже false)
+            freezeTime = false;
+            freezeTimeTimer = 0.0f;
+            fadeBlack = 0.0f;
+            switchDarkness = 0;
+            fadeStep = 0.0f;
+            moveCooldown = 0.0f;
+            contactDamageTimer = 0.0f;
+            selectedGameOverItem = 0;
+
+            if (startNewGame)
+            {
+                gameState = GameState::Playing;
+            }
+            else
+            {
+                gameState = GameState::Menu;
+                selectedMenuItem = 0;
+                menuHintVisible = false;
+            }
         }
 
-        // у каждого врага свой таймер шага: шатун ходит реже ищейки
-        if (!freezeTime)
-        {
-            for (int i = 0; i < enemies.size(); i++)
-            {
-                enemies[i]->stepTimerEnemy -= deltaTime;
-                if (enemies[i]->stepTimerEnemy <= 0.0f)
-                {
-                    int xCellOld = enemies[i]->xCellEnemy;
-                    int yCellOld = enemies[i]->yCellEnemy;
-                    enemies[i]->FindPlayer(player, dungeon, door, enemies);
+        // часы перезапускаем в любом состоянии: иначе после паузы deltaTime
+        // окажется равен всей её длине и таймеры сработают разом
+        float deltaTime = clock.restart().asSeconds();
 
-                    // клетка занята другим врагом — шаг отменяется: враги не
-                    // накладываются друг на друга (и на игроке стоит только один)
-                    for (int j = 0; j < enemies.size(); j++)
+        // объявлено снаружи: тряска камеры ниже читает его в любом состоянии
+        bool enemyCatchesPlayer = false;
+
+        // игровая логика идёт только в состоянии Playing
+        if (gameState == GameState::Playing)
+        {
+            moveCooldown -= deltaTime;
+
+            if (!freezeTime && moveCooldown <= 0.0f)
+            {
+                if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
+                {
+                    player.MovePlayer(0, -1, dungeon);
+                    moveCooldown = 0.1f;
+                }
+                else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down))
+                {
+                    player.MovePlayer(0, 1, dungeon);
+                    moveCooldown = 0.1f;
+                }
+                else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left))
+                {
+                    player.MovePlayer(-1, 0, dungeon);
+                    moveCooldown = 0.1f;
+                }
+                else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
+                {
+                    player.MovePlayer(1, 0, dungeon);
+                    moveCooldown = 0.1f;
+                }
+            }
+
+            // подбор зелья: игрок встал на клетку зелья — здоровье растёт,
+            // но не выше MAX_HP_PLAYER; зелье извлекается из вектора
+            for (int i = 0; i < potions.size(); i++)
+            {
+                if (player.xCellPlayer == potions[i].xPotion
+                    && player.yCellPlayer == potions[i].yPotion)
+                {
+                    int healAmount = POTION_HEAL;
+                    if (player.hpPlayer + POTION_HEAL > MAX_HP_PLAYER)
                     {
-                        if (j != i && enemies[i]->xCellEnemy == enemies[j]->xCellEnemy
-                            && enemies[i]->yCellEnemy == enemies[j]->yCellEnemy)
+                        healAmount = MAX_HP_PLAYER - player.hpPlayer; // лечим только до полного
+                    }
+                    player.hpPlayer += healAmount;
+                    hpText.setString("HP: " + std::to_string(player.hpPlayer));
+
+                    // зелёная вспышка в момент выпитого зелья
+                    SpawnBurst(particles,
+                               static_cast<float>(player.xCellPlayer * TILE_SIZE) + TILE_SIZE / 2.0f,
+                               static_cast<float>(player.yCellPlayer * TILE_SIZE) + TILE_SIZE / 2.0f,
+                               sf::Color(30, 220, 60));
+
+                    potions.erase(potions.begin() + i);
+                    i--; 
+                }
+            }
+
+            // игрок встал на выход — переход запускается один раз и дальше идёт по таймеру
+            if (!freezeTime && player.xCellPlayer == door.xCellDoor && player.yCellPlayer == door.yCellDoor)
+            {
+                freezeTime = true;
+                freezeTimeTimer = 3.0f;
+            }
+
+            // жизнь частиц: двигаем всех, затем мёртвых убираем из вектора
+            for (int i = 0; i < particles.size(); i++)
+            {
+                particles[i].UpdateParticle(deltaTime);
+                if (particles[i].lifeParticle <= 0.0f)
+                {
+                    particles.erase(particles.begin() + i);
+                    i--; // после erase не пропустить следующую частицу
+                }
+            }
+
+            if (freezeTime)
+            {
+                if (freezeTimeTimer > 0.0f)
+                {
+                    // фаза 1: пауза под будущую музыку перехода, мир заморожен
+                    freezeTimeTimer -= deltaTime;
+                    if (freezeTimeTimer <= 0.0f)
+                    {
+                        switchDarkness = 1; // пауза кончилась — начинаем затемнение
+                        fadeStep= FADE_STEP_TIME;
+                    }
+                }
+                else
+                {
+                    // фаза 2/3: ступени затемнения, смена мира под чёрным, осветление
+                    fadeStep-= deltaTime;
+                    if (fadeStep<= 0.0f)
+                    {
+                        if (gameOver)
                         {
-                            enemies[i]->SetPositionEnemy(xCellOld, yCellOld);
+                            fadeStep= GAMEOVER_FADE_STEP_TIME; // смерть темнеет медленно
+                        }
+                        else
+                        {
+                            fadeStep= FADE_STEP_TIME;           // переход — в обычном темпе
+                        }
+                        fadeBlack+= switchDarkness * FADE_STEP;
+
+                        if (fadeBlack>= 255.0f)
+                        {
+                            // экран полностью чёрный — глаз не видит подмены
+                            fadeBlack= 255.0f;
+                            if (!gameOver)
+                            {
+                                // обычный переход: смена мира под чёрным
+                                // номер растёт ДО генерации: зелья нового уровня считаются по его номеру
+                                levelNumber++;
+                                StartNextLevel(dungeon, player, enemies, door, potions, levelNumber);
+                                levelText.setString("Level: " + std::to_string(levelNumber));
+                                switchDarkness = -1;
+                            }
+                            // при gameOver чёрный экран просто держится —
+                            // на нём работает мини-меню смерти
+                        }
+                        else if (fadeBlack<= 0.0f)
+                        {
+                            fadeBlack= 0.0f;
+                            switchDarkness = 0;
+                            freezeTime = false; // переход завершён
                         }
                     }
-                    // только теперь известно, состоялся ли шаг: сначала проверка, потом анимация
-                    enemies[i]->AnimateStepEnemy(xCellOld, yCellOld);
-                    enemies[i]->stepTimerEnemy = enemies[i]->stepTimeEnemy;
                 }
             }
-        }
 
-        // проверяем, догнал ли игрока враг; на клетке игрока стоит максимум один
-        // (шаг на занятую клетку отменяется), бьёт он своим уроном
-        bool enemyCatchesPlayer = false;
-        int damageCatch = 0;
-        for (const std::unique_ptr<Enemy> &enemy : enemies)
-        {
-            if (enemy->xCellEnemy == player.xCellPlayer
-                && enemy->yCellEnemy == player.yCellPlayer)
+            // у каждого врага свой таймер шага: шатун ходит реже ищейки
+            if (!freezeTime)
             {
-                enemyCatchesPlayer = true;
-                if (enemy->damageEnemy > damageCatch)
+                for (int i = 0; i < enemies.size(); i++)
                 {
-                    damageCatch = enemy->damageEnemy;
+                    enemies[i]->stepTimerEnemy -= deltaTime;
+                    if (enemies[i]->stepTimerEnemy <= 0.0f)
+                    {
+                        int xCellOld = enemies[i]->xCellEnemy;
+                        int yCellOld = enemies[i]->yCellEnemy;
+                        enemies[i]->FindPlayer(player, dungeon, door, enemies);
+
+                        // клетка занята другим врагом — шаг отменяется: враги не
+                        // накладываются друг на друга (и на игроке стоит только один)
+                        for (int j = 0; j < enemies.size(); j++)
+                        {
+                            if (j != i && enemies[i]->xCellEnemy == enemies[j]->xCellEnemy
+                                && enemies[i]->yCellEnemy == enemies[j]->yCellEnemy)
+                            {
+                                enemies[i]->SetPositionEnemy(xCellOld, yCellOld);
+                            }
+                        }
+                        // только теперь известно, состоялся ли шаг: сначала проверка, потом анимация
+                        enemies[i]->AnimateStepEnemy(xCellOld, yCellOld);
+                        enemies[i]->stepTimerEnemy = enemies[i]->stepTimeEnemy;
+                    }
+                }
+            }
+
+            // проверяем, догнал ли игрока враг; на клетке игрока стоит максимум один
+            // (шаг на занятую клетку отменяется), бьёт он своим уроном
+            int damageCatch = 0;
+            for (const std::unique_ptr<Enemy> &enemy : enemies)
+            {
+                if (enemy->xCellEnemy == player.xCellPlayer
+                    && enemy->yCellEnemy == player.yCellPlayer)
+                {
+                    enemyCatchesPlayer = true;
+                    if (enemy->damageEnemy > damageCatch)
+                    {
+                        damageCatch = enemy->damageEnemy;
+                    }
+                }
+            }
+
+            // урон при поимке: враг стоит на клетке игрока — здоровье тратится
+            // через CONTACT_DAMAGE_INTERVAL секунд, пока контакт не прервётся
+            contactDamageTimer -= deltaTime; // тик таймера урона (каждый кадр)
+
+            if (enemyCatchesPlayer && !gameOver && contactDamageTimer <= 0.0f)
+            {
+                player.hpPlayer -= damageCatch;
+                // после зелья HP не кратно урону и может уйти в минус: на панели показываем 0
+                if (player.hpPlayer < 0)
+                {
+                    player.hpPlayer = 0;
+                }
+                hpText.setString("HP: " + std::to_string(player.hpPlayer));
+                contactDamageTimer = CONTACT_DAMAGE_INTERVAL; // пауза до следующего удара
+
+                // красные искры из центра клетки удара
+                SpawnBurst(particles,
+                           static_cast<float>(player.xCellPlayer * TILE_SIZE) + TILE_SIZE / 2.0f,
+                           static_cast<float>(player.yCellPlayer * TILE_SIZE) + TILE_SIZE / 2.0f,
+                           sf::Color(220, 30, 30));
+
+                if (player.hpPlayer <= 0)
+                {
+                    // смерть: замороженное медленное затемнение
+                    gameOver = true;
+                    freezeTime = true;
+                    freezeTimeTimer = 0.0f;              // без 3-секундной паузы
+                    switchDarkness = 1;                   // сразу темнеем
+                    fadeStep = GAMEOVER_FADE_STEP_TIME;   // но медленно: шаг за 0.5 с
+
+                    // счёт пройденных уровней: умерли на levelNumber —
+                    // значит, завершили levelNumber − 1
+                    gameOverStats.setString("Levels passed: " + std::to_string(levelNumber - 1));
+
+                    // центрируем надписи по горизонтали (по ширине каждой)
+                    gameOverTitle.setPosition((WINDOW_WIDTH - gameOverTitle.getGlobalBounds().width) / 2.0f, 180.f);
+                    gameOverStats.setPosition((WINDOW_WIDTH - gameOverStats.getGlobalBounds().width) / 2.0f, 265.f);
                 }
             }
         }
 
-        // урон при поимке: враг стоит на клетке игрока — здоровье тратится
-        // через CONTACT_DAMAGE_INTERVAL секунд, пока контакт не прервётся
-        contactDamageTimer -= deltaTime; // тик таймера урона (каждый кадр)
-
-        if (enemyCatchesPlayer && !gameOver && contactDamageTimer <= 0.0f)
+        // в меню мир не рисуем: кадр собран, остальной цикл пропускаем
+        if (gameState == GameState::Menu)
         {
-            player.hpPlayer -= damageCatch;
-            // после зелья HP не кратно урону и может уйти в минус: на панели показываем 0
-            if (player.hpPlayer < 0)
+            window.clear();
+            window.setView(window.getDefaultView());
+            if (textures.menuLoaded)
             {
-                player.hpPlayer = 0;
+                window.draw(menuPicture);
             }
-            hpText.setString("HP: " + std::to_string(player.hpPlayer));
-            contactDamageTimer = CONTACT_DAMAGE_INTERVAL; // пауза до следующего удара
-
-            // красные искры из центра клетки удара
-            SpawnBurst(particles,
-                       static_cast<float>(player.xCellPlayer * TILE_SIZE) + TILE_SIZE / 2.0f,
-                       static_cast<float>(player.yCellPlayer * TILE_SIZE) + TILE_SIZE / 2.0f,
-                       sf::Color(220, 30, 30));
-
-            if (player.hpPlayer <= 0)
+            else if (fontLoaded)
             {
-                // смерть: замороженное медленное затемнение
-                gameOver = true;
-                freezeTime = true;
-                freezeTimeTimer = 0.0f;              // без 3-секундной паузы
-                switchDarkness = 1;                   // сразу темнеем
-                fadeStep = GAMEOVER_FADE_STEP_TIME;   // но медленно: шаг за 0.5 с
-
-                // счёт пройденных уровней: умерли на levelNumber —
-                // значит, завершили levelNumber − 1
-                gameOverStats.setString("Levels passed: " + std::to_string(levelNumber - 1));
-
-                // центрируем все три надписи по горизонтали (по ширине каждой)
-                gameOverTitle.setPosition((WINDOW_WIDTH - gameOverTitle.getGlobalBounds().width) / 2.0f, 200.f);
-                gameOverStats.setPosition((WINDOW_WIDTH - gameOverStats.getGlobalBounds().width) / 2.0f, 280.f);
-                gameOverText.setPosition((WINDOW_WIDTH - gameOverText.getGlobalBounds().width) / 2.0f, 330.f);
+                window.draw(menuTitle);
             }
+            window.draw(menuPanel);
+            if (fontLoaded && menuConfirmOpen)
+            {
+                window.draw(menuConfirmTitle);
+                DrawMenuItems(window, menuConfirmItems, CONFIRM_ITEMS_COUNT, selectedConfirmItem);
+            }
+            else if (fontLoaded)
+            {
+                DrawMenuItems(window, menuItems, MENU_ITEMS_COUNT, selectedMenuItem);
+                if (menuHintVisible)
+                {
+                    window.draw(menuHint);
+                }
+            }
+            window.display();
+            continue;
         }
 
         // позиция камеры: центр клетки игрока
@@ -625,6 +931,7 @@ int main()
         {
             window.draw(hpText);
             window.draw(levelText);
+            window.draw(hintText);
         }
 
         fadeShape.setFillColor(sf::Color(0, 0, 0, static_cast<sf::Uint8>(fadeBlack)));
@@ -636,7 +943,22 @@ int main()
         {
             window.draw(gameOverTitle);
             window.draw(gameOverStats);
-            window.draw(gameOverText);
+            DrawMenuItems(window, gameOverItems, GAMEOVER_ITEMS_COUNT, selectedGameOverItem);
+        }
+
+        if (gameState == GameState::Paused)
+        {
+            window.draw(pauseShape);
+            if (fontLoaded && pauseConfirmOpen)
+            {
+                window.draw(confirmTitle);
+                DrawMenuItems(window, confirmItems, CONFIRM_ITEMS_COUNT, selectedConfirmItem);
+            }
+            else if (fontLoaded)
+            {
+                window.draw(pauseTitle);
+                DrawMenuItems(window, pauseItems, PAUSE_ITEMS_COUNT, selectedPauseItem);
+            }
         }
 
         window.display();
