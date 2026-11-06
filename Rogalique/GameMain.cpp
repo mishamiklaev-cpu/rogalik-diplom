@@ -2,6 +2,7 @@
 #include "Door.h"
 #include "Dungeon.h"
 #include "Enemy.h"
+#include "GameRecords.h"
 #include "GameSounds.h"
 #include "GameTextures.h"
 #include "Particle.h"
@@ -19,7 +20,9 @@ enum class GameState
 {
     Menu,
     Playing,
-    Paused
+    Paused,
+    Records,
+    Options
 };
 
 // собирает пункты меню: текст и место по центру окна, столбиком сверху вниз
@@ -406,12 +409,47 @@ int main()
     BuildMenuItems(menuItems, menuNames, MENU_ITEMS_COUNT, font, MENU_ITEMS_Y);
     int selectedMenuItem = 0; // номер выбранного пункта: просто число, не адрес в памяти
 
-    // заглушка: Records и Options пока не работают, Enter показывает эту надпись
-    sf::Text menuHint("Coming soon", font, 22);
-    menuHint.setFillColor(sf::Color::White);
-    // справа от плашки: снизу под пунктами места нет
-    menuHint.setPosition(WINDOW_WIDTH / 2.0f + 110.f, MENU_ITEMS_Y + 45.f);
-    bool menuHintVisible = false;
+    // экран рекордов: строки собираются при рисовании из таблицы
+    GameRecords gameRecords;
+    gameRecords.LoadRecords();
+
+    sf::Text recordsTitle("Records", font, 44);
+    recordsTitle.setFillColor(sf::Color::White);
+    recordsTitle.setPosition((WINDOW_WIDTH - recordsTitle.getGlobalBounds().width) / 2.0f, 30.f);
+
+    sf::Text recordLine("", font, 26);
+    recordLine.setFillColor(sf::Color::White);
+
+    sf::Text backHint("Esc - Back", font, 22);
+    backHint.setFillColor(sf::Color(180, 180, 180));
+    backHint.setPosition((WINDOW_WIDTH - backHint.getGlobalBounds().width) / 2.0f, 555.f);
+
+    // экран опций: подписи On и Off меняются при переключении
+    sf::Text optionsTitle("Options", font, 44);
+    optionsTitle.setFillColor(sf::Color::White);
+    optionsTitle.setPosition((WINDOW_WIDTH - optionsTitle.getGlobalBounds().width) / 2.0f, 150.f);
+
+    const int OPTIONS_ITEMS_COUNT = 3;
+    std::string optionsNames[OPTIONS_ITEMS_COUNT] = { "Music: On", "Sounds: On", "Back" };
+    sf::Text optionsItems[OPTIONS_ITEMS_COUNT];
+    BuildMenuItems(optionsItems, optionsNames, OPTIONS_ITEMS_COUNT, font, 250.f);
+    int selectedOptionsItem = 0;
+
+    // ввод имени на экране смерти: после Enter вместо него появляется мини-меню
+    sf::Text namePrompt("Enter your name:", font, 24);
+    namePrompt.setFillColor(sf::Color::White);
+    namePrompt.setPosition((WINDOW_WIDTH - namePrompt.getGlobalBounds().width) / 2.0f, 330.f);
+
+    sf::Text nameText("", font, 30);
+    nameText.setFillColor(sf::Color(240, 180, 40));
+
+    sf::Text nameSkipHint("Enter - Save     Esc - Skip", font, 22);
+    nameSkipHint.setFillColor(sf::Color(180, 180, 180));
+    nameSkipHint.setPosition((WINDOW_WIDTH - nameSkipHint.getGlobalBounds().width) / 2.0f, 430.f);
+
+    const int MAX_NAME_LENGTH = 12;
+    std::string playerName;
+    bool nameEntryOpen = false;
 
     // экран паузы: полупрозрачная пелена, поверх неё надписи по центру окна
     sf::RectangleShape pauseShape(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT));
@@ -471,6 +509,19 @@ int main()
                 window.close();
             }
 
+            // TextEntered приходит с уже готовым символом с учётом раскладки и регистра.
+            // Только латиница и цифры: имя пишется в файл через пробел, в нём не должно быть пробелов
+            if (event.type == sf::Event::TextEntered && gameOver && nameEntryOpen
+                && fadeBlack >= 255.0f && playerName.size() < MAX_NAME_LENGTH)
+            {
+                sf::Uint32 symbol = event.text.unicode;
+                if ((symbol >= 'a' && symbol <= 'z') || (symbol >= 'A' && symbol <= 'Z')
+                    || (symbol >= '0' && symbol <= '9'))
+                {
+                    playerName += static_cast<char>(symbol);
+                }
+            }
+
             // клавиши меню и паузы — события, а не isKeyPressed: одно нажатие — одно действие.
             // Цепочка else if: нажатие обрабатывает только один экран
             if (event.type == sf::Event::KeyPressed)
@@ -496,11 +547,7 @@ int main()
                 else if (gameState == GameState::Menu)
                 {
                     MoveMenuSelection(selectedMenuItem, MENU_ITEMS_COUNT, key, sounds);
-                    if (key == sf::Keyboard::Up || key == sf::Keyboard::Down)
-                    {
-                        menuHintVisible = false;
-                    }
-                    else if (key == sf::Keyboard::Enter)
+                    if (key == sf::Keyboard::Enter)
                     {
                         if (selectedMenuItem == 0)
                         {
@@ -508,15 +555,68 @@ int main()
                             sounds.menuMusic.stop();
                             sounds.gameMusic.play();
                         }
-                        else if (selectedMenuItem == MENU_ITEMS_COUNT - 1)
+                        else if (selectedMenuItem == 1)
+                        {
+                            gameState = GameState::Records;
+                        }
+                        else if (selectedMenuItem == 2)
+                        {
+                            gameState = GameState::Options;
+                            selectedOptionsItem = 0;
+                        }
+                        else
                         {
                             menuConfirmOpen = true;
                             selectedConfirmItem = 1; // по умолчанию No, как и на паузе
                         }
+                    }
+                }
+                else if (gameState == GameState::Records)
+                {
+                    if (key == sf::Keyboard::Escape || key == sf::Keyboard::Enter)
+                    {
+                        gameState = GameState::Menu;
+                    }
+                }
+                else if (gameState == GameState::Options)
+                {
+                    MoveMenuSelection(selectedOptionsItem, OPTIONS_ITEMS_COUNT, key, sounds);
+                    if (key == sf::Keyboard::Escape)
+                    {
+                        gameState = GameState::Menu;
+                    }
+                    else if (key == sf::Keyboard::Enter)
+                    {
+                        if (selectedOptionsItem == 0)
+                        {
+                            sounds.SetMusicOn(!sounds.musicOn);
+                            if (sounds.musicOn)
+                            {
+                                optionsNames[0] = "Music: On";
+                            }
+                            else
+                            {
+                                optionsNames[0] = "Music: Off";
+                            }
+                        }
+                        else if (selectedOptionsItem == 1)
+                        {
+                            sounds.SetSoundsOn(!sounds.soundsOn);
+                            if (sounds.soundsOn)
+                            {
+                                optionsNames[1] = "Sounds: On";
+                            }
+                            else
+                            {
+                                optionsNames[1] = "Sounds: Off";
+                            }
+                        }
                         else
                         {
-                            menuHintVisible = true; // Records и Options: пока заглушки
+                            gameState = GameState::Menu;
                         }
+                        // ширина текста изменилась: пункты центрируем заново
+                        BuildMenuItems(optionsItems, optionsNames, OPTIONS_ITEMS_COUNT, font, 250.f);
                     }
                 }
                 else if (gameState == GameState::Paused && pauseConfirmOpen)
@@ -566,8 +666,31 @@ int main()
                 }
                 else if (gameOver)
                 {
-                    // пункты работают, только когда экран смерти уже показан
-                    if (fadeBlack >= 255.0f)
+                    // клавиши работают, только когда экран смерти уже показан.
+                    // Сначала ввод имени, после него — мини-меню
+                    if (fadeBlack >= 255.0f && nameEntryOpen)
+                    {
+                        if (key == sf::Keyboard::BackSpace && !playerName.empty())
+                        {
+                            playerName.pop_back();
+                        }
+                        else if (key == sf::Keyboard::Enter)
+                        {
+                            if (playerName.empty())
+                            {
+                                playerName = "Player";
+                            }
+                            gameRecords.AddRecord(playerName, levelNumber - 1);
+                            nameEntryOpen = false;
+                            sounds.selectSound.play();
+                        }
+                        else if (key == sf::Keyboard::Escape)
+                        {
+                            nameEntryOpen = false; // пропуск: рекорд не записывается
+                            sounds.selectSound.play();
+                        }
+                    }
+                    else if (fadeBlack >= 255.0f)
                     {
                         MoveMenuSelection(selectedGameOverItem, GAMEOVER_ITEMS_COUNT, key, sounds);
                         if (key == sf::Keyboard::Enter)
@@ -625,7 +748,6 @@ int main()
                 gameState = GameState::Menu;
                 sounds.menuMusic.play();
                 selectedMenuItem = 0;
-                menuHintVisible = false;
             }
         }
 
@@ -835,6 +957,8 @@ int main()
                 {
                     // смерть: замороженное медленное затемнение
                     gameOver = true;
+                    nameEntryOpen = true;
+                    playerName.clear();
                     sounds.gameMusic.stop();
                     sounds.gameOverSound.play();
                     freezeTime = true;
@@ -879,10 +1003,46 @@ int main()
             else if (fontLoaded)
             {
                 DrawMenuItems(window, menuItems, MENU_ITEMS_COUNT, selectedMenuItem);
-                if (menuHintVisible)
+            }
+            window.display();
+            continue;
+        }
+
+        // экраны рекордов и опций: чёрный фон, мир тоже не рисуем
+        if (gameState == GameState::Records)
+        {
+            window.clear();
+            window.setView(window.getDefaultView());
+            if (fontLoaded)
+            {
+                window.draw(recordsTitle);
+                if (gameRecords.records.empty())
                 {
-                    window.draw(menuHint);
+                    recordLine.setString("No records yet");
+                    recordLine.setPosition((WINDOW_WIDTH - recordLine.getGlobalBounds().width) / 2.0f, 250.f);
+                    window.draw(recordLine);
                 }
+                for (int i = 0; i < gameRecords.records.size(); i++)
+                {
+                    recordLine.setString(gameRecords.records[i].nameRecord + " - "
+                                         + std::to_string(gameRecords.records[i].levelsRecord));
+                    recordLine.setPosition((WINDOW_WIDTH - recordLine.getGlobalBounds().width) / 2.0f, 110.f + i * 42.f);
+                    window.draw(recordLine);
+                }
+                window.draw(backHint);
+            }
+            window.display();
+            continue;
+        }
+
+        if (gameState == GameState::Options)
+        {
+            window.clear();
+            window.setView(window.getDefaultView());
+            if (fontLoaded)
+            {
+                window.draw(optionsTitle);
+                DrawMenuItems(window, optionsItems, OPTIONS_ITEMS_COUNT, selectedOptionsItem);
             }
             window.display();
             continue;
@@ -972,7 +1132,18 @@ int main()
         {
             window.draw(gameOverTitle);
             window.draw(gameOverStats);
-            DrawMenuItems(window, gameOverItems, GAMEOVER_ITEMS_COUNT, selectedGameOverItem);
+            if (nameEntryOpen)
+            {
+                window.draw(namePrompt);
+                nameText.setString(playerName + "_"); // чёрточка показывает, куда идёт ввод
+                nameText.setPosition((WINDOW_WIDTH - nameText.getGlobalBounds().width) / 2.0f, 375.f);
+                window.draw(nameText);
+                window.draw(nameSkipHint);
+            }
+            else
+            {
+                DrawMenuItems(window, gameOverItems, GAMEOVER_ITEMS_COUNT, selectedGameOverItem);
+            }
         }
 
         if (gameState == GameState::Paused)
