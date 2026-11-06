@@ -27,6 +27,38 @@ class GameSounds
     sf::Sound gameOverSound;
     sf::Sound damageSound;
 
+    // опции: громкость 0 — выключено, 100 — включено. Музыка при этом продолжает идти беззвучно
+    bool musicOn = true;
+    bool soundsOn = true;
+
+    void SetMusicOn(bool on)
+    {
+        musicOn = on;
+        float volume = 0.f;
+        if (on)
+        {
+            volume = 100.f;
+        }
+        menuMusic.setVolume(volume);
+        gameMusic.setVolume(volume);
+    }
+
+    void SetSoundsOn(bool on)
+    {
+        soundsOn = on;
+        float volume = 0.f;
+        if (on)
+        {
+            volume = 100.f;
+        }
+        clickSound.setVolume(volume);
+        selectSound.setVolume(volume);
+        potionSound.setVolume(volume);
+        doorSound.setVolume(volume);
+        gameOverSound.setVolume(volume);
+        damageSound.setVolume(volume);
+    }
+
     void LoadSounds()
     {
         LoadMusic(menuMusic, "menu.wav");
