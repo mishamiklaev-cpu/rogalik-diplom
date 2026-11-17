@@ -163,7 +163,9 @@
     <ClCompile Include="Potion.cpp" />
     <ClCompile Include="Particle.cpp" />
     <ClCompile Include="Enemy.cpp" />
+    <ClCompile Include="GameLevel.cpp" />
     <ClCompile Include="GameMain.cpp" />
+    <ClCompile Include="GameMenu.cpp" />
     <ClCompile Include="GameTextures.cpp" />
     <ClCompile Include="Player.cpp" />
   </ItemGroup>
@@ -174,6 +176,8 @@
     <ClInclude Include="Potion.h" />
     <ClInclude Include="Particle.h" />
     <ClInclude Include="Enemy.h" />
+    <ClInclude Include="GameLevel.h" />
+    <ClInclude Include="GameMenu.h" />
     <ClInclude Include="GameRecords.h" />
     <ClInclude Include="GameSounds.h" />
     <ClInclude Include="GameTextures.h" />

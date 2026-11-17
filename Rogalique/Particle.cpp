@@ -1,4 +1,5 @@
 #include "Particle.h"
+#include <cstdlib>
 
 Particle::Particle()
 {
@@ -25,4 +26,20 @@ void Particle::DrawParticle(sf::RenderWindow &window) const
     particleShape.setFillColor(colorParticle);
     particleShape.setPosition(sf::Vector2f(xParticle, yParticle));
     window.draw(particleShape);
+}
+
+void SpawnBurst(std::vector<Particle> &particles, float xPoint, float yPoint,
+                sf::Color color)
+{
+    for (int i = 0; i < PARTICLE_COUNT; i++)
+    {
+        Particle particle;
+        particle.xParticle = xPoint + static_cast<float>(rand() % 21 - 10);
+        particle.yParticle = yPoint + static_cast<float>(rand() % 21 - 10);
+        particle.dxParticle = static_cast<float>(rand() % 101 - 50); // -50..+50 px/c
+        particle.dyParticle = static_cast<float>(rand() % 101 - 50);
+        particle.lifeParticle = PARTICLE_LIFE_TIME;
+        particle.colorParticle = color;
+        particles.push_back(particle);
+    }
 }
