@@ -37,6 +37,9 @@
     <ClCompile Include="GameLevel.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
+    <ClCompile Include="Game.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Constants.h">
@@ -79,6 +82,9 @@
       <Filter>Sources</Filter>
     </ClInclude>
     <ClInclude Include="GameLevel.h">
+      <Filter>Sources</Filter>
+    </ClInclude>
+    <ClInclude Include="Game.h">
       <Filter>Sources</Filter>
     </ClInclude>
   </ItemGroup>
