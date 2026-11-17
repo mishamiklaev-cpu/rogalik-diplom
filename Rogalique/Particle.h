@@ -1,6 +1,7 @@
 #pragma once
 #include "Constants.h"
 #include <SFML/Graphics.hpp>
+#include <vector>
 
 // частица — мелкая искра события: родилась, разлетелась, погасла.
 // Всё её поведение строится на таймере жизни (наш знакомый приём)
@@ -19,3 +20,9 @@ class Particle
     void UpdateParticle(float deltaTime);          // движение + таяние жизни
     void DrawParticle(sf::RenderWindow &window) const; // рисование не меняет частицу
 };
+
+// вспышка частиц из точки события:
+// разлёт в случайные стороны, позиции слегка разбросаны вокруг точки.
+// Не метод класса: одна частица о вспышке не знает, вспышка — это группа частиц в векторе
+void SpawnBurst(std::vector<Particle> &particles, float xPoint, float yPoint,
+                sf::Color color);

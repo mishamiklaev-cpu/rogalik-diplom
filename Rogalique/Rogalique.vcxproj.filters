@@ -31,6 +31,12 @@
     <ClCompile Include="GameTextures.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
+    <ClCompile Include="GameMenu.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="GameLevel.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Constants.h">
@@ -67,6 +73,12 @@
       <Filter>Sources</Filter>
     </ClInclude>
     <ClInclude Include="GameRecords.h">
+      <Filter>Sources</Filter>
+    </ClInclude>
+    <ClInclude Include="GameMenu.h">
+      <Filter>Sources</Filter>
+    </ClInclude>
+    <ClInclude Include="GameLevel.h">
       <Filter>Sources</Filter>
     </ClInclude>
   </ItemGroup>
