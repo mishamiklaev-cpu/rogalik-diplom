@@ -63,5 +63,11 @@
     <ClInclude Include="GameTextures.h">
       <Filter>Sources</Filter>
     </ClInclude>
+    <ClInclude Include="GameSounds.h">
+      <Filter>Sources</Filter>
+    </ClInclude>
+    <ClInclude Include="GameRecords.h">
+      <Filter>Sources</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
