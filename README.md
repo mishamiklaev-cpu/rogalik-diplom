@@ -9,7 +9,7 @@ Roguelike с процедурным подземельем. Героя похи�
 
 ## Как запустить
 
-1. Скачай `Rogalique-v2.0-win64.zip` из [Releases](https://github.com/mishamiklaev-cpu/rogalik-diplom/releases).
+1. Скачай `Rogalique-v2.1-win64.zip` из [Releases](https://github.com/mishamiklaev-cpu/rogalik-diplom/releases).
 2. Распакуй всю папку и запусти `Rogalique.exe`. Рядом с exe должны лежать `openal32.dll`
    и папка `Resources`: без dll игра не запустится, без `Resources` не будет картинок и звука.
 
@@ -69,6 +69,17 @@ Roguelike с процедурным подземельем. Героя похи�
   вспышка из 12 частиц в точке события: красные искры при ударе, зелёная вспышка
   при выпитом зелье. Частицы разлетаются и через 0.6 с исчезают: удаляются из вектора, когда кончилась жизнь.
 
+## Структура кода
+
+- `GameMain.cpp` — только `main`: `Game game; game.Run();`
+- `Game.h/.cpp` — класс `Game`, вся игра целиком. Конструктор `Game()` один раз готовит окно,
+  мир, текстуры, звуки и надписи. `Run()` — игровой цикл: каждый кадр вызывает
+  `HandleEvents()` (клавиши), `Update(deltaTime)` (логика) и `Draw()` (рисование).
+- `GameMenu` — состояния экранов и пункты меню, `GameLevel` — раскладка уровня
+  (зелья, враги, переход на новый уровень).
+- Остальные классы — элементы игры: `Dungeon`, `Player`, `Enemy` и его наследники,
+  `Door`, `Potion`, `Particle`.
+
 ## Сборка из исходников
 
 Нужна Visual Studio 2022 и SFML 2.5.1 в папке `SFML/` рядом с `rogalique.sln`
@@ -106,5 +117,9 @@ Roguelike с процедурным подземельем. Героя похи�
 | #18 | `feature/sound` | музыка и звуковые эффекты |
 | #19 | `feature/records-options` | таблица рекордов с сохранением в файл, экран опций, README и Design Doc к релизу v2.0 |
 | #20 | `docs/release-v2` | Design Doc: итог спринта 3 после выхода Release v2.0 |
+| #21 | `fix/project-headers` | заголовки GameSounds.h и GameRecords.h добавлены в проект VS |
+| #22 | `refactor/split-helpers` | вспомогательные функции вынесены из GameMain.cpp по файлам |
+| #23 | `refactor/game-class` | вся игра стала классом Game, main — две строки; Release v2.1 |
+| #24 | `docs/readme-v2.1` | README под Release v2.1: структура кода, PR #21–#24 |
 
 Механики, оценка в сторипоинтах, спринты «план и факт» и бэклог — в [Design Doc](docs/design-doc.md).
